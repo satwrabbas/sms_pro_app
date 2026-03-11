@@ -1,0 +1,38 @@
+name: my_pro_app
+description: My first professional boilerplate
+version: 1.0.0+1
+publish_to: none
+
+environment:
+  sdk: ^3.11.0
+  flutter: ^3.41.0
+
+dependencies:
+  bloc: ^9.2.0
+  flutter:
+    sdk: flutter
+  flutter_bloc: ^9.1.1
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.20.2
+  local_storage_api:
+   path: packages/local_storage_api
+  crm_repository:
+    path: packages/crm_repository 
+  cloud_storage_api:
+    path: packages/cloud_storage_api
+  flutter_contacts: ^2.0.0
+  supabase_flutter: ^2.12.0
+
+dev_dependencies:
+  bloc_lint: ^0.3.7
+  bloc_test: ^10.0.0
+  bloc_tools: ^0.1.0-dev.22
+  flutter_test:
+    sdk: flutter
+  mocktail: ^1.0.4
+  very_good_analysis: ^10.2.0
+
+flutter:
+  generate: true
+  uses-material-design: true
