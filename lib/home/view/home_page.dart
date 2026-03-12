@@ -4,6 +4,7 @@ import '../cubit/home_cubit.dart';
 import 'package:my_pro_app/campaigns/view/campaigns_page.dart';
 // استدعاء شاشة جهات الاتصال التي صنعناها
 import 'package:my_pro_app/contacts/view/contacts_page.dart'; 
+import 'package:my_pro_app/dashboard/view/dashboard_page.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -27,19 +28,15 @@ class HomeView extends StatelessWidget {
 
     // قائمة الشاشات (سنضيف الشاشات الأخرى لاحقاً)
     final List<Widget> pages =[
-      // 1. لوحة التحكم (مؤقتة لحين برمجتها)
-      const Scaffold(
-        body: Center(
-          child: Text('📊 لوحة التحكم (قريباً)', style: TextStyle(fontSize: 24)),
-        ),
-      ),
-      
-      // 2. شاشة جهات الاتصال (التي تعمل بنجاح)
-      const ContactsPage(),
-      
-      // 3. شاشة الحملات (مؤقتة لحين برمجتها)
-      const CampaignsPage(),
-    ];
+   // 1. لوحة التحكم (🌟 تم استبدالها)
+   const DashboardPage(),
+   
+   // 2. شاشة جهات الاتصال
+   const ContactsPage(),
+   
+   // 3. شاشة الحملات
+   const CampaignsPage(),
+  ];
 
     return Scaffold(
       // نعرض الشاشة بناءً على الرقم المختار

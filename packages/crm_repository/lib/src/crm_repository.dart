@@ -101,4 +101,24 @@ class CrmRepository {
     );
     return await _localStorage.insertSchedule(companion);
   }
+
+  // ==========================================
+  // 4. قسم السجلات (Logs) 📊
+  // ==========================================
+
+  /// جلب سجل الرسائل المرسلة
+  Future<List<Message>> getMessageLogs() async {
+    return await _localStorage.getAllMessages();
+  }
+
+  /// إضافة سجل جديد (عند نجاح إرسال SMS)
+  Future<int> addMessageLog({required String phone, required String body, required String type}) async {
+    final companion = MessagesCompanion(
+      phone: drift.Value(phone),
+      body: drift.Value(body),
+      type: drift.Value(type),
+      messageDate: drift.Value(DateTime.now()), // حفظ وقت وتاريخ الإرسال
+    );
+    return await _localStorage.insertMessage(companion);
+  }
 }
