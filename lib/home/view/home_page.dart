@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../cubit/home_cubit.dart';
-
+import 'package:my_pro_app/campaigns/view/campaigns_page.dart';
 // استدعاء شاشة جهات الاتصال التي صنعناها
 import 'package:my_pro_app/contacts/view/contacts_page.dart'; 
 
@@ -38,11 +38,7 @@ class HomeView extends StatelessWidget {
       const ContactsPage(),
       
       // 3. شاشة الحملات (مؤقتة لحين برمجتها)
-      const Scaffold(
-        body: Center(
-          child: Text('🚀 إدارة الحملات والمجموعات (قريباً)', style: TextStyle(fontSize: 24)),
-        ),
-      ),
+      const CampaignsPage(),
     ];
 
     return Scaffold(

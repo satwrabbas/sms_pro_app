@@ -1,10 +1,9 @@
 import 'package:local_storage_api/local_storage_api.dart';
-import 'package:cloud_storage_api/cloud_storage_api.dart'; // ☁️ استدعاء السحابة
+import 'package:cloud_storage_api/cloud_storage_api.dart'; // ☁️
 import 'package:drift/drift.dart' as drift;
 
 /// المدير المسؤول عن إدارة بيانات التطبيق (محلياً وسحابياً)
 class CrmRepository {
-  // المدير الآن يطلب مفاتيح المخزن المحلي ومفاتيح السحابة عند تعيينه
   const CrmRepository({
     required AppDatabase localStorage,
     required CloudStorageClient cloudStorage,
@@ -44,6 +43,7 @@ class CrmRepository {
 
   Future<void> saveSyncedContacts(List<Map<String, String>> phoneContacts) async {
     for (var contact in phoneContacts) {
+      // لاحظ هنا: ContactsCompanion بدون .drift لأنها من حزمتنا
       final companion = ContactsCompanion(
         name: drift.Value(contact['name'] ?? 'بدون اسم'),
         phone: drift.Value(contact['phone'] ?? ''),
@@ -54,5 +54,39 @@ class CrmRepository {
 
   Future<int> deleteContact(Contact contact) async {
     return await _localStorage.deleteContact(contact);
+  }
+
+  // ==========================================
+  // 3. قسم المجموعات والحملات (Groups & Campaigns) 📅
+  // ==========================================
+
+  Future<List<Group>> getGroups() async {
+    return await _localStorage.getAllGroups();
+  }
+
+  Future<int> addGroup(String name) async {
+    // 🌟 التصحيح هنا: حذفنا drift. من قبل GroupsCompanion
+    final companion = GroupsCompanion(
+      name: drift.Value(name),
+    );
+    return await _localStorage.insertGroup(companion);
+  }
+
+  Future<List<Schedule>> getSchedules() async {
+    return await _localStorage.getAllSchedules();
+  }
+
+  Future<int> addSchedule({
+    required int groupId,
+    required String message,
+    required int sendDay,
+  }) async {
+    // 🌟 التصحيح هنا: حذفنا drift. من قبل SchedulesCompanion
+    final companion = SchedulesCompanion(
+      groupId: drift.Value(groupId),
+      message: drift.Value(message),
+      sendDay: drift.Value(sendDay),
+    );
+    return await _localStorage.insertSchedule(companion);
   }
 }
