@@ -23,6 +23,23 @@ class DashboardView extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('لوحة التحكم (CRM)'),
+        actions:[
+          // 🌟 زر المزامنة السحابية الجديد
+          BlocBuilder<DashboardCubit, DashboardState>(
+            builder: (context, state) {
+              final isRunning = state is DashboardLoaded && state.isEngineRunning;
+              return IconButton(
+                icon: const Icon(Icons.cloud_upload, color: Colors.white),
+                tooltip: 'رفع النسخة الاحتياطية للسحابة',
+                onPressed: isRunning
+                    ? null // تعطيل الزر إذا كانت هناك عملية تعمل
+                    : () {
+                        context.read<DashboardCubit>().syncDataToCloud();
+                      },
+              );
+            },
+          ),
+        ],
       ),
       // BlocListener لعرض نوافذ الـ SnackBar عند تشغيل المحرك
       body: BlocConsumer<DashboardCubit, DashboardState>(

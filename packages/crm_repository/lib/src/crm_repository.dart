@@ -110,4 +110,58 @@ class CrmRepository {
     );
     return await _localStorage.insertMessage(companion);
   }
+
+// ==========================================
+  // 5. قسم المزامنة الشاملة (Cloud Sync) ☁️
+  // ==========================================
+
+  /// رفع كل البيانات المحلية إلى Supabase
+  Future<void> syncAllToCloud() async {
+    // 1. جلب كل البيانات من الهاتف
+    final groups = await _localStorage.getAllGroups();
+    final contacts = await _localStorage.getAllContacts();
+    final schedules = await _localStorage.getAllSchedules();
+    
+    // 🌟 التصحيح هنا: استخدمنا getAllMessages بدلاً من getMessageLogs
+    final messages = await _localStorage.getAllMessages(); 
+
+    // 2. تحويل المجموعات
+    final groupsJson = groups.map((g) => {
+      'id': g.id,
+      'name': g.name,
+    }).toList();
+
+    // 3. تحويل جهات الاتصال
+    final contactsJson = contacts.map((c) => {
+      'id': c.id,
+      'name': c.name,
+      'phone': c.phone,
+      'group_id': c.groupId, 
+    }).toList();
+
+    // 4. تحويل الحملات المجدولة
+    final schedulesJson = schedules.map((s) => {
+      'id': s.id,
+      'group_id': s.groupId,
+      'message': s.message,
+      'send_day': s.sendDay,
+      'last_sent_date': s.lastSentDate?.toIso8601String(),
+      'is_active': s.isActive,
+    }).toList();
+
+    // 5. تحويل سجلات الرسائل
+    final messagesJson = messages.map((m) => {
+      'id': m.id,
+      'phone': m.phone,
+      'body': m.body,
+      'type': m.type,
+      'message_date': m.messageDate.toIso8601String(),
+    }).toList();
+
+    // 6. إرسالها إلى السحابة عبر العميل
+    await _cloudStorage.syncGroups(groupsJson);
+    await _cloudStorage.syncContacts(contactsJson);
+    await _cloudStorage.syncSchedules(schedulesJson);
+    await _cloudStorage.syncMessages(messagesJson);
+  }
 }

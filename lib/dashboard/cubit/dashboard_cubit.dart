@@ -116,4 +116,47 @@ class DashboardCubit extends Cubit<DashboardState> {
       ));
     }
   }
+
+
+
+  /// ☁️ رفع كل البيانات إلى Supabase
+  Future<void> syncDataToCloud() async {
+    if (state is DashboardLoaded) {
+      final currentState = state as DashboardLoaded;
+      
+      // إخبار الشاشة ببدء التحميل وعرض رسالة
+      emit(DashboardLoaded(
+        contactsCount: currentState.contactsCount,
+        groupsCount: currentState.groupsCount,
+        schedulesCount: currentState.schedulesCount,
+        recentLogs: currentState.recentLogs,
+        isEngineRunning: true, // نستخدم نفس المتغير لتدوير التحميل
+        engineStatusMessage: '🔄 جاري رفع كل البيانات للسحابة...',
+      ));
+
+      try {
+        await _repository.syncAllToCloud();
+        
+        // النجاح
+        emit(DashboardLoaded(
+          contactsCount: currentState.contactsCount,
+          groupsCount: currentState.groupsCount,
+          schedulesCount: currentState.schedulesCount,
+          recentLogs: currentState.recentLogs,
+          isEngineRunning: false,
+          engineStatusMessage: '✅ تمت المزامنة والرفع للسحابة بنجاح!',
+        ));
+      } catch (e) {
+        // الفشل
+        emit(DashboardLoaded(
+          contactsCount: currentState.contactsCount,
+          groupsCount: currentState.groupsCount,
+          schedulesCount: currentState.schedulesCount,
+          recentLogs: currentState.recentLogs,
+          isEngineRunning: false,
+          engineStatusMessage: '❌ فشلت المزامنة: تأكد من اتصال الإنترنت أو جداول Supabase',
+        ));
+      }
+    }
+  }
 }

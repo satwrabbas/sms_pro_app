@@ -33,5 +33,25 @@ class CloudStorageClient {
   /// جلب بيانات المستخدم الحالي
   Session? get currentSession => _supabaseClient.auth.currentSession;
 
+  // ==========================================
+  // قسم المزامنة (Sync) 🔄
+  // ==========================================
+
+  Future<void> syncGroups(List<Map<String, dynamic>> groups) async {
+    if (groups.isNotEmpty) await _supabaseClient.from('groups').upsert(groups);
+  }
+
+  Future<void> syncContacts(List<Map<String, dynamic>> contacts) async {
+    // نعتمد على id كمفتاح أساسي لمنع التكرار
+    if (contacts.isNotEmpty) await _supabaseClient.from('contacts').upsert(contacts);
+  }
+
+  Future<void> syncSchedules(List<Map<String, dynamic>> schedules) async {
+    if (schedules.isNotEmpty) await _supabaseClient.from('schedules').upsert(schedules);
+  }
+
+  Future<void> syncMessages(List<Map<String, dynamic>> messages) async {
+    if (messages.isNotEmpty) await _supabaseClient.from('messages').upsert(messages);
+  }
   // سيتم إضافة دوال المزامنة (جلب المجموعات والرسائل) هنا لاحقاً!
 }
