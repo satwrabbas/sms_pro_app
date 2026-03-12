@@ -12,22 +12,34 @@ class ContactsCubit extends Cubit<ContactsState> {
 
   final CrmRepository _repository;
 
+  /// جلب العملاء والمجموعات معاً
   Future<void> loadContacts() async {
     emit(ContactsLoading());
     try {
       final contacts = await _repository.getContacts();
-      emit(ContactsLoaded(contacts: contacts));
+      final groups = await _repository.getGroups(); // 🌟 جلبنا المجموعات أيضاً
+      emit(ContactsLoaded(contacts: contacts, groups: groups));
     } catch (e) {
       emit(ContactsError(message: e.toString()));
     }
   }
 
+  /// 🌟 الدالة الجديدة: ربط العميل بالمجموعة
+  Future<void> assignGroup(Contact contact, int? groupId) async {
+    try {
+      await _repository.updateContactGroup(contact, groupId);
+      await loadContacts(); // تحديث الشاشة فوراً لتعكس التغيير
+    } catch (e) {
+      emit(ContactsError(message: 'خطأ في تعيين المجموعة: $e'));
+    }
+  }
+
+  /// مزامنة الهاتف (كما أصلحناها سابقاً)
   Future<void> syncFromPhone() async {
     emit(ContactsSyncing());
     try {
-      // 🚀 التصحيح الأول: أضفنا نوع الصلاحية المطلوبة
       final status = await phone_contacts.FlutterContacts.permissions.request(
-        phone_contacts.PermissionType.read, // نريد فقط قراءة الأسماء
+        phone_contacts.PermissionType.read,
       );
 
       if (status == phone_contacts.PermissionStatus.granted || status == phone_contacts.PermissionStatus.limited) {
@@ -42,7 +54,6 @@ class ContactsCubit extends Cubit<ContactsState> {
         for (var c in contactsFromPhone) {
           if (c.phones.isNotEmpty) {
             formattedContacts.add({
-              // 🚀 التصحيح الثاني: أضفنا قيمة افتراضية في حال كان الاسم فارغاً
               'name': c.displayName ?? 'بدون اسم',
               'phone': c.phones.first.number,
             });
@@ -50,7 +61,6 @@ class ContactsCubit extends Cubit<ContactsState> {
         }
 
         await _repository.saveSyncedContacts(formattedContacts);
-        
         await loadContacts();
       } else {
         emit(ContactsError(message: 'تم رفض صلاحية الوصول لجهات الاتصال'));

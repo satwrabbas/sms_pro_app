@@ -64,6 +64,18 @@ class CrmRepository {
     return await _localStorage.getAllGroups();
   }
 
+  /// 🌟 الدالة الجديدة: تحديث المجموعة الخاصة بجهة اتصال معينة
+  Future<void> updateContactGroup(Contact contact, int? groupId) async {
+    final companion = ContactsCompanion(
+      id: drift.Value(contact.id), // نحافظ على نفس الـ ID
+      name: drift.Value(contact.name), // نحافظ على الاسم
+      phone: drift.Value(contact.phone), // نحافظ على الرقم
+      groupId: drift.Value(groupId), // 🌟 نحدث المجموعة فقط!
+    );
+    // ستكتشف القاعدة أن الـ ID موجود مسبقاً فتقوم بتحديثه فوراً
+    await _localStorage.insertContact(companion); 
+  }
+  
   Future<int> addGroup(String name) async {
     // 🌟 التصحيح هنا: حذفنا drift. من قبل GroupsCompanion
     final companion = GroupsCompanion(

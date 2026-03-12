@@ -4,13 +4,15 @@ abstract class ContactsState {}
 
 class ContactsInitial extends ContactsState {}
 
-class ContactsLoading extends ContactsState {} // جاري التحميل من قاعدة البيانات
+class ContactsLoading extends ContactsState {} 
 
-class ContactsSyncing extends ContactsState {} // جاري سحب الأسماء من الهاتف
+class ContactsSyncing extends ContactsState {} 
 
 class ContactsLoaded extends ContactsState {
-  final List<Contact> contacts; // Contact هنا قادمة من حزمتنا local_storage_api
-  ContactsLoaded({required this.contacts});
+  final List<Contact> contacts;
+  final List<Group> groups; // 🌟 أضفنا قائمة المجموعات هنا
+  
+  ContactsLoaded({required this.contacts, required this.groups});
 }
 
 class ContactsError extends ContactsState {
