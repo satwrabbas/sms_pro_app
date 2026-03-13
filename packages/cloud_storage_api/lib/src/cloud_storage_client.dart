@@ -85,4 +85,17 @@ class CloudStorageClient {
     if (_currentUserId == null) return[];
     return await _supabaseClient.from('messages').select().eq('user_id', _currentUserId!);
   }
+
+  // ==========================================
+  // قسم الحذف (Delete)
+  // ==========================================
+  Future<void> deleteGroup(int id) async {
+    if (_currentUserId == null) return;
+    await _supabaseClient.from('groups').delete().eq('id', id).eq('user_id', _currentUserId!);
+  }
+
+  Future<void> deleteSchedule(int id) async {
+    if (_currentUserId == null) return;
+    await _supabaseClient.from('schedules').delete().eq('id', id).eq('user_id', _currentUserId!);
+  }
 }

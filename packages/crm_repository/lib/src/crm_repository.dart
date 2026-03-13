@@ -30,9 +30,12 @@ class CrmRepository {
   }
 
   Future<void> signOut() async {
+    // 1. 🧹 مسح كل البيانات المحلية من هاتف المستخدم لحماية خصوصيته
+    await _localStorage.clearAllData();
+    
+    // 2. ☁️ تسجيل الخروج من السحابة (Supabase)
     await _cloudStorage.signOut();
   }
-
   // ==========================================
   // 2. قسم جهات الاتصال (Contacts) 💾
   // ==========================================
@@ -223,5 +226,28 @@ class CrmRepository {
     }
   }
 
-  
+  // --- دوال الحذف الجديدة (تتحدث مع الهاتف والسحابة معاً) ---
+  Future<void> deleteGroup(Group group) async {
+    // 1. نظف العملاء المرتبطين بالمجموعة أولاً
+    await _localStorage.clearGroupFromContacts(group.id);
+    // 2. احذف المجموعة من الهاتف
+    await _localStorage.deleteGroup(group);
+    // 3. احذفها من السحابة
+    await _cloudStorage.deleteGroup(group.id);
+  }
+
+  Future<void> deleteSchedule(Schedule schedule) async {
+    await _localStorage.deleteSchedule(schedule);
+    await _cloudStorage.deleteSchedule(schedule.id);
+  }
+
+  // --- دوال التعديل الجديدة ---
+  Future<void> updateGroup(Group group) async {
+    await _localStorage.updateGroup(group);
+    // لا نحتاج لاستدعاء السحابة مباشرة، لأن المزامنة الشاملة (upsert) ستتكفل بذلك لاحقاً
+  }
+
+  Future<void> updateSchedule(Schedule schedule) async {
+    await _localStorage.updateSchedule(schedule);
+  }
 }

@@ -21,25 +21,37 @@ class CampaignsPage extends StatelessWidget {
 class CampaignsView extends StatelessWidget {
   const CampaignsView({super.key});
 
-  // نافذة إضافة مجموعة جديدة
-  void _showAddGroupDialog(BuildContext context) {
-    final nameController = TextEditingController();
+  // 🌟 نافذة ذكية: للإضافة (إذا كان group فارغاً) أو للتعديل والحذف
+  void _showGroupDialog(BuildContext context, {Group? group}) {
+    final isEditing = group != null;
+    final nameController = TextEditingController(text: isEditing ? group.name : '');
     final cubit = context.read<CampaignsCubit>();
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('مجموعة جديدة'),
+        title: Text(isEditing ? 'تعديل المجموعة' : 'مجموعة جديدة'),
         content: TextField(
           controller: nameController,
           decoration: const InputDecoration(labelText: 'اسم المجموعة (مثال: عملاء VIP)'),
         ),
         actions:[
+          if (isEditing) // زر الحذف يظهر فقط في حالة التعديل
+            TextButton(
+              onPressed: () {
+                cubit.deleteGroup(group);
+                Navigator.pop(context);
+              },
+              child: const Text('حذف', style: TextStyle(color: Colors.red)),
+            ),
+          const Spacer(),
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
           ElevatedButton(
             onPressed: () {
               if (nameController.text.isNotEmpty) {
-                cubit.createGroup(nameController.text.trim());
+                isEditing
+                    ? cubit.editGroup(group, nameController.text.trim()) // تعديل
+                    : cubit.createGroup(nameController.text.trim()); // إضافة
                 Navigator.pop(context);
               }
             },
@@ -50,8 +62,8 @@ class CampaignsView extends StatelessWidget {
     );
   }
 
-  // نافذة إضافة حملة جديدة (رسالة مجدولة)
-  void _showAddScheduleDialog(BuildContext context, List<Group> groups) {
+  // 🌟 نافذة ذكية: للإضافة أو لتعديل/حذف الحملة
+  void _showScheduleDialog(BuildContext context, List<Group> groups, {Schedule? schedule}) {
     if (groups.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('يجب إنشاء مجموعة أولاً!'), backgroundColor: Colors.orange),
@@ -59,16 +71,22 @@ class CampaignsView extends StatelessWidget {
       return;
     }
 
-    final messageController = TextEditingController();
-    final dayController = TextEditingController();
-    Group? selectedGroup = groups.first; // اختيار أول مجموعة كافتراضي
+    final isEditing = schedule != null;
+    final messageController = TextEditingController(text: isEditing ? schedule.message : '');
+    final dayController = TextEditingController(text: isEditing ? schedule.sendDay.toString() : '');
+    
+    // تحديد المجموعة المحددة مسبقاً إذا كنا في وضع التعديل
+    Group? selectedGroup = isEditing 
+        ? groups.firstWhere((g) => g.id == schedule.groupId, orElse: () => groups.first)
+        : groups.first; 
+
     final cubit = context.read<CampaignsCubit>();
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('حملة أتمتة جديدة 🚀'),
+          title: Text(isEditing ? 'تعديل الحملة 🚀' : 'حملة أتمتة جديدة 🚀'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -95,16 +113,26 @@ class CampaignsView extends StatelessWidget {
             ),
           ),
           actions:[
+            if (isEditing) // زر الحذف
+              TextButton(
+                onPressed: () {
+                  cubit.deleteSchedule(schedule);
+                  Navigator.pop(context);
+                },
+                child: const Text('حذف', style: TextStyle(color: Colors.red)),
+              ),
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
             ElevatedButton(
               onPressed: () {
                 final day = int.tryParse(dayController.text);
                 if (messageController.text.isNotEmpty && day != null && day >= 1 && day <= 31 && selectedGroup != null) {
-                  cubit.createSchedule(groupId: selectedGroup!.id, message: messageController.text.trim(), sendDay: day);
+                  isEditing
+                      ? cubit.editSchedule(originalSchedule: schedule, newMessage: messageController.text.trim(), newSendDay: day) // تعديل
+                      : cubit.createSchedule(groupId: selectedGroup!.id, message: messageController.text.trim(), sendDay: day); // إضافة
                   Navigator.pop(context);
                 }
               },
-              child: const Text('جدولة الحملة'),
+              child: const Text('حفظ'),
             ),
           ],
         ),
@@ -114,7 +142,6 @@ class CampaignsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // استخدمنا DefaultTabController لتقسيم الشاشة لتبويبين
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -149,7 +176,6 @@ class CampaignsView extends StatelessWidget {
                             itemCount: schedules.length,
                             itemBuilder: (context, i) {
                               final schedule = schedules[i];
-                              // البحث عن اسم المجموعة المرتبطة بالحملة
                               final groupName = groups.firstWhere((g) => g.id == schedule.groupId, orElse: () => const Group(id: -1, name: 'محذوفة')).name;
                               
                               return Card(
@@ -159,12 +185,14 @@ class CampaignsView extends StatelessWidget {
                                   title: Text('لمجموعة: $groupName'),
                                   subtitle: Text('رسالة: ${schedule.message}'),
                                   trailing: Text('يوم: ${schedule.sendDay}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                                  // 🌟 عند الضغط، نفتح نافذة الحملات ولكن في وضع التعديل
+                                  onTap: () => _showScheduleDialog(context, groups, schedule: schedule),
                                 ),
                               );
                             },
                           ),
                     floatingActionButton: FloatingActionButton.extended(
-                      onPressed: () => _showAddScheduleDialog(context, groups),
+                      onPressed: () => _showScheduleDialog(context, groups),
                       icon: const Icon(Icons.add),
                       label: const Text('حملة جديدة'),
                     ),
@@ -177,14 +205,20 @@ class CampaignsView extends StatelessWidget {
                         : ListView.builder(
                             itemCount: groups.length,
                             itemBuilder: (context, i) {
+                              final group = groups[i];
                               return ListTile(
                                 leading: const Icon(Icons.folder, color: Colors.amber),
-                                title: Text(groups[i].name),
+                                title: Text(group.name),
+                                // 🌟 زر أيقونة التعديل
+                                trailing: IconButton(
+                                  icon: const Icon(Icons.edit, color: Colors.grey),
+                                  onPressed: () => _showGroupDialog(context, group: group),
+                                ),
                               );
                             },
                           ),
                     floatingActionButton: FloatingActionButton.extended(
-                      onPressed: () => _showAddGroupDialog(context),
+                      onPressed: () => _showGroupDialog(context),
                       icon: const Icon(Icons.add),
                       label: const Text('مجموعة جديدة'),
                     ),

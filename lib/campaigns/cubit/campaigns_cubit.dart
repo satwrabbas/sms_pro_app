@@ -44,4 +44,31 @@ class CampaignsCubit extends Cubit<CampaignsState> {
       emit(CampaignsError(message: 'خطأ في إنشاء الحملة: $e'));
     }
   }
+
+  // --- دوال الحذف والتعديل ---
+  Future<void> deleteGroup(Group group) async {
+    await _repository.deleteGroup(group);
+    await loadCampaignsData(); // تحديث الشاشة
+  }
+
+  Future<void> editGroup(Group group, String newName) async {
+    await _repository.updateGroup(group.copyWith(name: newName));
+    await loadCampaignsData();
+  }
+
+  Future<void> deleteSchedule(Schedule schedule) async {
+    await _repository.deleteSchedule(schedule);
+    await loadCampaignsData();
+  }
+
+  Future<void> editSchedule({
+    required Schedule originalSchedule,
+    required String newMessage,
+    required int newSendDay,
+  }) async {
+    await _repository.updateSchedule(
+      originalSchedule.copyWith(message: newMessage, sendDay: newSendDay),
+    );
+    await loadCampaignsData();
+  }
 }

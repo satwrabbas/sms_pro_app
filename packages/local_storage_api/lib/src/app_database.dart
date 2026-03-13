@@ -68,7 +68,34 @@ class AppDatabase extends _$AppDatabase {
   Future<List<Message>> getAllMessages() => (select(messages)..orderBy([(t) => OrderingTerm.desc(t.messageDate)])).get();
   Future<int> insertMessage(MessagesCompanion msg) => into(messages).insert(msg);
 
+  // --- دوال الحذف الجديدة ---
+  Future<int> deleteGroup(Group group) => delete(groups).delete(group);
+  Future<int> deleteSchedule(Schedule schedule) => delete(schedules).delete(schedule);
 
+  // دالة ذكية لإزالة العملاء من مجموعة ما قبل حذفها (لمنع الأخطاء)
+  Future<void> clearGroupFromContacts(int groupId) {
+    return (update(contacts)..where((t) => t.groupId.equals(groupId))).write(
+      const ContactsCompanion(groupId: Value(null)),
+    );
+  }
+
+  // --- دوال التعديل الجديدة ---
+  Future<bool> updateGroup(Group group) => update(groups).replace(group);
+  Future<bool> updateSchedule(Schedule schedule) => update(schedules).replace(schedule);
+
+  // ==========================================
+  // 🧹 دالة المسح الشامل (عند تسجيل الخروج)
+  // ==========================================
+  Future<void> clearAllData() {
+    // نستخدم transaction لضمان مسح كل الجداول معاً
+    return transaction(() async {
+      // نبدأ بحذف الجداول الفرعية ثم الأساسية لتجنب أي تعارض
+      await delete(messages).go();
+      await delete(schedules).go();
+      await delete(contacts).go();
+      await delete(groups).go();
+    });
+  }
 }
 
 LazyDatabase _openConnection() {
