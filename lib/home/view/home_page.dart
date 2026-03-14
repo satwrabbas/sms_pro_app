@@ -40,10 +40,7 @@ class HomeView extends StatelessWidget {
 
     return Scaffold(
       // نعرض الشاشة بناءً على الرقم المختار
-      body: IndexedStack(
-        index: selectedTab,
-        children: pages,
-      ),
+      body: pages[selectedTab],
       
       // شريط التنقل السفلي
       bottomNavigationBar: NavigationBar(

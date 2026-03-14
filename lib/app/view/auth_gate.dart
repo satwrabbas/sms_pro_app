@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:crm_repository/crm_repository.dart';
-import 'package:cloud_storage_api/cloud_storage_api.dart'; // نحتاج هذا من أجل AuthState و Session
-
-// استدعاء شاشاتنا
+import 'package:cloud_storage_api/cloud_storage_api.dart'; 
 import 'package:my_pro_app/login/view/login_page.dart';
 import 'package:my_pro_app/home/view/home_page.dart';
 
@@ -12,28 +10,48 @@ class AuthGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 1. جلب المدير
     final repository = context.read<CrmRepository>();
 
-    // 2. الاستماع المستمر (Stream) لحالة السحابة
     return StreamBuilder<AuthState>(
       stream: repository.authStateChanges,
       builder: (context, snapshot) {
-        // إذا كانت السحابة لا تزال تفكر (تحمل)
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
 
-        // 3. التحقق من وجود جلسة (Session)
         final session = snapshot.hasData ? snapshot.data!.session : null;
 
-        // 4. التوجيه التلقائي
         if (session != null) {
-          return const HomePage(); // إذا كان مسجل دخول -> الرئيسية
+          // 🌟 السحر هنا: نطلب من التطبيق تنزيل البيانات قبل الدخول للرئيسية
+          return FutureBuilder(
+            // نستخدم دالة التنزيل التي بنيناها سابقاً
+            future: repository.downloadAllFromCloud(),
+            builder: (context, downloadSnapshot) {
+              
+              // طالما أنه لا يزال يحمل، نعرض شاشة تهيئة جميلة
+              if (downloadSnapshot.connectionState == ConnectionState.waiting) {
+                return const Scaffold(
+                  body: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children:[
+                        CircularProgressIndicator(color: Colors.teal),
+                        SizedBox(height: 24),
+                        Text('جاري تهيئة مساحة العمل...', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        SizedBox(height: 8),
+                        Text('يتم الآن جلب عملائك وحملاتك من السحابة ☁️', style: TextStyle(color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              
+              // بمجرد الانتهاء (سواء نجح أو فشل بسبب غياب الإنترنت)، ندخله للرئيسية!
+              return const HomePage();
+            },
+          );
         } else {
-          return const LoginPage(); // إذا لم يكن مسجل -> تسجيل الدخول
+          return const LoginPage();
         }
       },
     );
