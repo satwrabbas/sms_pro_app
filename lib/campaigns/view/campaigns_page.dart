@@ -184,8 +184,21 @@ class CampaignsView extends StatelessWidget {
                                   leading: const CircleAvatar(backgroundColor: Colors.blue, child: Icon(Icons.sms, color: Colors.white)),
                                   title: Text('لمجموعة: $groupName'),
                                   subtitle: Text('رسالة: ${schedule.message}'),
-                                  trailing: Text('يوم: ${schedule.sendDay}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
-                                  // 🌟 عند الضغط، نفتح نافذة الحملات ولكن في وضع التعديل
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children:[
+                                      Text('يوم: ${schedule.sendDay}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                                      const SizedBox(width: 8),
+                                      // 🌟 زر التشغيل والإيقاف (Switch)
+                                      Switch(
+                                        value: schedule.isActive,
+                                        activeColor: Colors.green,
+                                        onChanged: (val) {
+                                          context.read<CampaignsCubit>().toggleScheduleActive(schedule);
+                                        },
+                                      ),
+                                    ],
+                                  ),                                  // 🌟 عند الضغط، نفتح نافذة الحملات ولكن في وضع التعديل
                                   onTap: () => _showScheduleDialog(context, groups, schedule: schedule),
                                 ),
                               );

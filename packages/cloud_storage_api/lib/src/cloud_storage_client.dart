@@ -98,4 +98,17 @@ class CloudStorageClient {
     if (_currentUserId == null) return;
     await _supabaseClient.from('schedules').delete().eq('id', id).eq('user_id', _currentUserId!);
   }
+
+  // ==========================================
+  // 🌟 حفظ مفتاح الهاتف (FCM Token) في السحابة
+  // ==========================================
+  Future<void> saveFcmToken(String token) async {
+    if (_currentUserId == null) return;
+    
+    await _supabaseClient.from('user_tokens').upsert({
+      'user_id': _currentUserId,
+      'fcm_token': token,
+      'updated_at': DateTime.now().toIso8601String(),
+    });
+  }
 }

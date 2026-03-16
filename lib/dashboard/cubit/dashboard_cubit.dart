@@ -3,7 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:crm_repository/crm_repository.dart';
 import 'package:local_storage_api/local_storage_api.dart';
 import 'package:telephony/telephony.dart';
-
+import 'package:firebase_messaging/firebase_messaging.dart';
 part 'dashboard_state.dart';
 
 class DashboardCubit extends Cubit<DashboardState> {
@@ -14,7 +14,9 @@ class DashboardCubit extends Cubit<DashboardState> {
   final CrmRepository _repository;
   final Telephony telephony = Telephony.instance;
 
-  /// تحميل الإحصائيات لعرضها في الشاشة
+  // ==========================================
+  // 1. تحميل بيانات لوحة التحكم
+  // ==========================================
   Future<void> loadDashboard() async {
     try {
       final contacts = await _repository.getContacts();
@@ -22,104 +24,84 @@ class DashboardCubit extends Cubit<DashboardState> {
       final schedules = await _repository.getSchedules();
       final logs = await _repository.getMessageLogs();
 
+      final isRunning = (state is DashboardLoaded) ? (state as DashboardLoaded).isEngineRunning : false;
+
       emit(DashboardLoaded(
         contactsCount: contacts.length,
         groupsCount: groups.length,
         schedulesCount: schedules.length,
         recentLogs: logs,
+        isEngineRunning: isRunning,
       ));
     } catch (e) {
-      // تجاهل الأخطاء البسيطة في لوحة التحكم
+      // تجاهل الأخطاء البسيطة
     }
   }
 
-  /// 🚀 المحرك الذكي للأتمتة (Automation Engine)
-  Future<void> runAutomationEngine() async {
-    // 1. تغيير الحالة لـ "جاري التشغيل" لندور أيقونة التحميل في الشاشة
+// ==========================================
+  // 2. 🌟 تفعيل العقل السحابي (FCM)
+  // ==========================================
+  Future<void> toggleEngine() async {
     if (state is DashboardLoaded) {
       final currentState = state as DashboardLoaded;
+      final isRunning = !currentState.isEngineRunning; 
+
       emit(DashboardLoaded(
         contactsCount: currentState.contactsCount,
         groupsCount: currentState.groupsCount,
         schedulesCount: currentState.schedulesCount,
         recentLogs: currentState.recentLogs,
-        isEngineRunning: true,
+        isEngineRunning: isRunning,
+        engineStatusMessage: isRunning 
+            ? '🔄 جاري الاتصال بالسحابة...' 
+            : '🛑 تم إيقاف المحرك.',
       ));
-    }
 
-    try {
-      if (!Platform.isAndroid) throw 'ميزة إرسال الـ SMS متاحة للأندرويد فقط!';
+      if (isRunning) {
+        try {
+          // 1. طلب صلاحية استقبال الإشارات من فايربيس
+          FirebaseMessaging messaging = FirebaseMessaging.instance;
+          await messaging.requestPermission(
+            alert: false, // لا نريد إشعارات مرئية مزعجة
+            badge: false,
+            sound: false,
+            provisional: false,
+          );
 
-      // 2. طلب صلاحية الـ SMS
-      bool? permissionsGranted = await telephony.requestPhoneAndSmsPermissions;
-      if (permissionsGranted == null || !permissionsGranted) {
-        throw 'لم يتم منح صلاحية الرسائل SMS';
-      }
+          // 2. جلب الـ Token الخاص بهذا الهاتف 📱🔑
+          final fcmToken = await messaging.getToken();
+          print("🔑 FCM TOKEN: $fcmToken");
 
-      // 3. جلب بيانات اليوم
-      final int currentDay = DateTime.now().day;
-      final schedules = await _repository.getSchedules();
-      final contacts = await _repository.getContacts();
-
-      int messagesSentCount = 0;
-
-      // 4. تشغيل فلتر الذكاء: ابحث عن حملة مخصصة لليوم
-      for (var schedule in schedules) {
-        if (schedule.isActive && schedule.sendDay == currentDay) {
-          
-          // ابحث عن العملاء الذين ينتمون لمجموعة هذه الحملة
-          final targetContacts = contacts.where((c) => c.groupId == schedule.groupId).toList();
-
-          // إرسال الرسائل
-          for (var contact in targetContacts) {
-            await telephony.sendSms(to: contact.phone, message: schedule.message);
-            messagesSentCount++;
-            
-            // حفظ في السجل
-            await _repository.addMessageLog(
-              phone: contact.phone, 
-              body: schedule.message, 
-              type: 'sent_auto'
-            );
-            
-            // تأخير بسيط ثانية واحدة بين كل رسالة لتجنب حظر شريحة الاتصال (Spam)
-            await Future.delayed(const Duration(seconds: 1));
+          // 🌟 3. إرسال المفتاح فوراً إلى Supabase ليتم حفظه!
+          if (fcmToken != null) {
+            await _repository.saveFcmToken(fcmToken);
           }
+
+          emit(DashboardLoaded(
+            contactsCount: currentState.contactsCount,
+            groupsCount: currentState.groupsCount,
+            schedulesCount: currentState.schedulesCount,
+            recentLogs: currentState.recentLogs,
+            isEngineRunning: true,
+            engineStatusMessage: '📡 الهاتف متصل بالسحابة وجاهز لاستقبال أوامر الـ SMS الصامتة!',
+          ));
+
+        } catch (e) {
+          emit(DashboardLoaded(
+            contactsCount: currentState.contactsCount,
+            groupsCount: currentState.groupsCount,
+            schedulesCount: currentState.schedulesCount,
+            recentLogs: currentState.recentLogs,
+            isEngineRunning: false,
+            engineStatusMessage: '❌ فشل الاتصال بالسحابة: $e',
+          ));
         }
       }
-
-      // 5. الانتهاء وإعادة تحميل السجلات الجديدة
-      await loadDashboard();
-      
-      final finalState = state as DashboardLoaded;
-      emit(DashboardLoaded(
-        contactsCount: finalState.contactsCount,
-        groupsCount: finalState.groupsCount,
-        schedulesCount: finalState.schedulesCount,
-        recentLogs: finalState.recentLogs,
-        isEngineRunning: false, // إيقاف دوران التحميل
-        engineStatusMessage: messagesSentCount > 0 
-            ? '🚀 تمت الأتمتة! أُرسلت $messagesSentCount رسالة بنجاح.' 
-            : '✅ المحرك عمل، ولكن لا يوجد حملات مجدولة لتاريخ اليوم ($currentDay).',
-      ));
-
-    } catch (e) {
-      await loadDashboard(); // العودة للحالة الطبيعية
-      final errorState = state as DashboardLoaded;
-      emit(DashboardLoaded(
-        contactsCount: errorState.contactsCount,
-        groupsCount: errorState.groupsCount,
-        schedulesCount: errorState.schedulesCount,
-        recentLogs: errorState.recentLogs,
-        isEngineRunning: false,
-        engineStatusMessage: '❌ خطأ: $e',
-      ));
     }
   }
-
-
-
-  /// 🔄 المزامنة الشاملة (رفع + تنزيل)
+  // ==========================================
+  // 3. 🔄 المزامنة الشاملة مع السحابة (رفع وتنزيل)
+  // ==========================================
   Future<void> syncDataToCloud() async {
     if (state is DashboardLoaded) {
       final currentState = state as DashboardLoaded;
@@ -129,18 +111,13 @@ class DashboardCubit extends Cubit<DashboardState> {
         groupsCount: currentState.groupsCount,
         schedulesCount: currentState.schedulesCount,
         recentLogs: currentState.recentLogs,
-        isEngineRunning: true,
+        isEngineRunning: currentState.isEngineRunning, // الحفاظ على حالة المحرك
         engineStatusMessage: '🔄 جاري المزامنة الشاملة (رفع وتنزيل)...',
       ));
 
       try {
-        // 1. رفع البيانات الجديدة من الهاتف للسحابة
         await _repository.syncAllToCloud();
-        
-        // 2. تنزيل البيانات الجديدة من السحابة للهاتف
         await _repository.downloadAllFromCloud();
-        
-        // 3. إعادة تحميل لوحة التحكم لتعكس الأرقام الجديدة
         await loadDashboard();
         
         final newState = state as DashboardLoaded;
@@ -149,7 +126,7 @@ class DashboardCubit extends Cubit<DashboardState> {
           groupsCount: newState.groupsCount,
           schedulesCount: newState.schedulesCount,
           recentLogs: newState.recentLogs,
-          isEngineRunning: false,
+          isEngineRunning: newState.isEngineRunning,
           engineStatusMessage: '✅ تمت المزامنة بنجاح!',
         ));
       } catch (e) {
@@ -158,10 +135,10 @@ class DashboardCubit extends Cubit<DashboardState> {
           groupsCount: currentState.groupsCount,
           schedulesCount: currentState.schedulesCount,
           recentLogs: currentState.recentLogs,
-          isEngineRunning: false,
+          isEngineRunning: currentState.isEngineRunning,
           engineStatusMessage: '❌ فشلت المزامنة: $e',
         ));
       }
     }
-  } 
+  }
 }

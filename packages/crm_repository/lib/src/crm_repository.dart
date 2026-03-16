@@ -118,6 +118,10 @@ class CrmRepository {
   // 5. قسم المزامنة الشاملة (Cloud Sync) ☁️
   // ==========================================
 
+  /// 🌟 تمرير مفتاح الهاتف للسحابة
+  Future<void> saveFcmToken(String token) async {
+    await _cloudStorage.saveFcmToken(token);
+  }
   /// رفع كل البيانات المحلية إلى Supabase
   Future<void> syncAllToCloud() async {
     // 1. جلب كل البيانات من الهاتف

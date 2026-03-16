@@ -22,37 +22,62 @@ class AuthGate extends StatelessWidget {
         final session = snapshot.hasData ? snapshot.data!.session : null;
 
         if (session != null) {
-          // 🌟 السحر هنا: نطلب من التطبيق تنزيل البيانات قبل الدخول للرئيسية
-          return FutureBuilder(
-            // نستخدم دالة التنزيل التي بنيناها سابقاً
-            future: repository.downloadAllFromCloud(),
-            builder: (context, downloadSnapshot) {
-              
-              // طالما أنه لا يزال يحمل، نعرض شاشة تهيئة جميلة
-              if (downloadSnapshot.connectionState == ConnectionState.waiting) {
-                return const Scaffold(
-                  body: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children:[
-                        CircularProgressIndicator(color: Colors.teal),
-                        SizedBox(height: 24),
-                        Text('جاري تهيئة مساحة العمل...', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                        SizedBox(height: 8),
-                        Text('يتم الآن جلب عملائك وحملاتك من السحابة ☁️', style: TextStyle(color: Colors.grey)),
-                      ],
-                    ),
-                  ),
-                );
-              }
-              
-              // بمجرد الانتهاء (سواء نجح أو فشل بسبب غياب الإنترنت)، ندخله للرئيسية!
-              return const HomePage();
-            },
-          );
+          // 🌟 نستخدم الشاشة الذكية الجديدة هنا لمنع التكرار
+          return const WorkspaceInitializer();
         } else {
           return const LoginPage();
         }
+      },
+    );
+  }
+}
+
+// ==========================================
+// 🌟 الشاشة الذكية للتهيئة (تعمل مرة واحدة فقط!)
+// ==========================================
+class WorkspaceInitializer extends StatefulWidget {
+  const WorkspaceInitializer({super.key});
+
+  @override
+  State<WorkspaceInitializer> createState() => _WorkspaceInitializerState();
+}
+
+class _WorkspaceInitializerState extends State<WorkspaceInitializer> {
+  late Future<void> _initFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    // 🌟 السحر هنا: نطلب التنزيل من السحابة مرة واحدة فقط عند فتح الشاشة!
+    _initFuture = context.read<CrmRepository>().downloadAllFromCloud();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder(
+      future: _initFuture,
+      builder: (context, snapshot) {
+        
+        // شاشة التحميل الأنيقة
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children:[
+                  CircularProgressIndicator(color: Colors.teal),
+                  SizedBox(height: 24),
+                  Text('جاري تهيئة مساحة العمل...', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  SizedBox(height: 8),
+                  Text('يتم الآن جلب عملائك وحملاتك من السحابة ☁️', style: TextStyle(color: Colors.grey)),
+                ],
+              ),
+            ),
+          );
+        }
+        
+        // بمجرد الانتهاء، ندخله للرئيسية ولن يعود للتحميل مجدداً
+        return const HomePage();
       },
     );
   }
