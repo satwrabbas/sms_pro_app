@@ -74,11 +74,11 @@ class DashboardView extends StatelessWidget {
 
                   // 2. زر تشغيل المحرك السحري
                   // 2. زر تشغيل وإيقاف المحرك (مع الأنيميشن)
+                // 2. زر ربط الهاتف بالسحابة (FCM)
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(15),
-                      // 🌟 تأثير التوهج الأخضر (Glow) عندما يكون المحرك يعمل
                       boxShadow: state.isEngineRunning 
                           ?[
                               BoxShadow(
@@ -91,23 +91,23 @@ class DashboardView extends StatelessWidget {
                     ),
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        // 🌟 دالة toggleEngine لتبديل الحالة بين التشغيل والإيقاف
                         context.read<DashboardCubit>().toggleEngine();
                       },
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 24),
-                        // 🌟 اللون الأخضر الداكن للتشغيل، والرمادي المائل للأزرق للإيقاف
-                        backgroundColor: state.isEngineRunning ? Colors.green[800] : Colors.teal[700],
+                        backgroundColor: state.isEngineRunning ? Colors.green[800] : Colors.blue[800], // غيرنا اللون للأزرق ليدل على السحابة
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                       ),
-                      // 🌟 استخدام أيقونة الرادار النابض إذا كان يعمل، وأيقونة الإيقاف إذا كان متوقفاً
+                      // 🌟 تغيير الأيقونات والنصوص لتطابق الواقع الهندسي
                       icon: state.isEngineRunning 
                           ? const RadarAnimation() 
-                          : const Icon(Icons.power_settings_new, size: 32),
+                          : const Icon(Icons.phonelink_ring, size: 32),
                       label: Text(
-                        state.isEngineRunning ? 'المحرك يعمل ويراقب الوقت 📡' : 'تشغيل محرك الأتمتة الآن 🚀', 
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
+                        state.isEngineRunning 
+                            ? 'الهاتف متصل بالسحابة وجاهز للإرسال 📡' 
+                            : 'ربط هذا الهاتف لاستقبال أوامر الأتمتة ☁️📱', 
+                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)
                       ),
                     ),
                   ),

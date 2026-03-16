@@ -29,11 +29,14 @@ class CrmRepository {
     await _cloudStorage.signUp(email: email, password: password);
   }
 
-  Future<void> signOut() async {
-    // 1. 🧹 مسح كل البيانات المحلية من هاتف المستخدم لحماية خصوصيته
+  Future<void> signOut() async {  
+    // 0. 🗑️ مسح مفتاح الهاتف من السحابة قبل الخروج
+    await removeFcmToken();
+    
+    // 1. 🧹 مسح كل البيانات المحلية 
     await _localStorage.clearAllData();
     
-    // 2. ☁️ تسجيل الخروج من السحابة (Supabase)
+    // 2. ☁️ تسجيل الخروج
     await _cloudStorage.signOut();
   }
   // ==========================================
@@ -116,6 +119,11 @@ class CrmRepository {
   /// 🌟 تمرير مفتاح الهاتف للسحابة
   Future<void> saveFcmToken(String token) async {
     await _cloudStorage.saveFcmToken(token);
+  }
+
+  /// 🗑️ حذف مفتاح الهاتف من السحابة
+  Future<void> removeFcmToken() async {
+    await _cloudStorage.removeFcmToken();
   }
   /// رفع كل البيانات المحلية إلى Supabase
   Future<void> syncAllToCloud() async {

@@ -111,4 +111,14 @@ class CloudStorageClient {
       'updated_at': DateTime.now().toIso8601String(),
     });
   }
+
+  // ==========================================
+  // 🗑️ حذف مفتاح الهاتف (عند فك الارتباط أو تسجيل الخروج)
+  // ==========================================
+  Future<void> removeFcmToken() async {
+    if (_currentUserId == null) return;
+    
+    // نحذف الصف الخاص بهذا المستخدم من جدول المفاتيح
+    await _supabaseClient.from('user_tokens').delete().eq('user_id', _currentUserId!);
+  }
 }
