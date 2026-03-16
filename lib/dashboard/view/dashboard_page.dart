@@ -73,22 +73,42 @@ class DashboardView extends StatelessWidget {
                   const SizedBox(height: 32),
 
                   // 2. زر تشغيل المحرك السحري
-                  ElevatedButton.icon(
-                    onPressed: state.isEngineRunning 
-                        ? null 
-                        : () => context.read<DashboardCubit>().runAutomationEngine(),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 24),
-                      backgroundColor: Colors.teal,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  // 2. زر تشغيل وإيقاف المحرك (مع الأنيميشن)
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(15),
+                      // 🌟 تأثير التوهج الأخضر (Glow) عندما يكون المحرك يعمل
+                      boxShadow: state.isEngineRunning 
+                          ?[
+                              BoxShadow(
+                                color: Colors.greenAccent.withOpacity(0.6),
+                                blurRadius: 20,
+                                spreadRadius: 5,
+                              )
+                            ]
+                          :[],
                     ),
-                    icon: state.isEngineRunning 
-                        ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white)) 
-                        : const Icon(Icons.play_circle_fill, size: 32),
-                    label: Text(
-                      state.isEngineRunning ? 'جاري الأتمتة وإرسال الرسائل...' : 'تشغيل محرك الأتمتة الآن 🚀', 
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        // 🌟 دالة toggleEngine لتبديل الحالة بين التشغيل والإيقاف
+                        context.read<DashboardCubit>().toggleEngine();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 24),
+                        // 🌟 اللون الأخضر الداكن للتشغيل، والرمادي المائل للأزرق للإيقاف
+                        backgroundColor: state.isEngineRunning ? Colors.green[800] : Colors.teal[700],
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                      ),
+                      // 🌟 استخدام أيقونة الرادار النابض إذا كان يعمل، وأيقونة الإيقاف إذا كان متوقفاً
+                      icon: state.isEngineRunning 
+                          ? const RadarAnimation() 
+                          : const Icon(Icons.power_settings_new, size: 32),
+                      label: Text(
+                        state.isEngineRunning ? 'المحرك يعمل ويراقب الوقت 📡' : 'تشغيل محرك الأتمتة الآن 🚀', 
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
+                      ),
                     ),
                   ),
                   const SizedBox(height: 32),
@@ -141,6 +161,39 @@ class DashboardView extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+
+// 🌟 أنيميشن "الرادار النابض"
+class RadarAnimation extends StatefulWidget {
+  const RadarAnimation({super.key});
+
+  @override
+  State<RadarAnimation> createState() => _RadarAnimationState();
+}
+
+class _RadarAnimationState extends State<RadarAnimation> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 1))..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _controller,
+      child: const Icon(Icons.radar, color: Colors.greenAccent, size: 40),
     );
   }
 }

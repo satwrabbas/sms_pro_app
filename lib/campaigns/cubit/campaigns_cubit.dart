@@ -71,4 +71,11 @@ class CampaignsCubit extends Cubit<CampaignsState> {
     );
     await loadCampaignsData();
   }
+
+  // 🌟 دالة جديدة لتبديل حالة تشغيل/إيقاف الحملة
+  Future<void> toggleScheduleActive(Schedule schedule) async {
+    // نغير حالة isActive لعكس ما هي عليه الآن
+    await _repository.updateSchedule(schedule.copyWith(isActive: !schedule.isActive));
+    await loadCampaignsData(); // تحديث الشاشة
+  }
 }
