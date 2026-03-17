@@ -101,6 +101,15 @@ class AppDatabase extends _$AppDatabase {
       await delete(groups).go();
     });
   }
+  // ==========================================
+  // 🔄 دوال المزامنة السحابية (Upsert: تحديث أو إضافة)
+  // ==========================================
+  Future<void> upsertGroup(GroupsCompanion group) => into(groups).insertOnConflictUpdate(group);
+  Future<void> upsertSchedule(SchedulesCompanion schedule) => into(schedules).insertOnConflictUpdate(schedule);
+  Future<void> upsertMessage(MessagesCompanion msg) => into(messages).insertOnConflictUpdate(msg);
+  
+  // بالنسبة للعملاء نستخدم insertOrReplace لأن رقم الهاتف Unique
+  Future<void> upsertContact(ContactsCompanion contact) => into(contacts).insert(contact, mode: InsertMode.insertOrReplace);
 }
 
 LazyDatabase _openConnection() {

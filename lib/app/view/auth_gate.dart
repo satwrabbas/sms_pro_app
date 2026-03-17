@@ -53,19 +53,20 @@ class _WorkspaceInitializerState extends State<WorkspaceInitializer> {
   }
 
   // ==========================================
-  // 🌟 دالة الشفاء الذاتي (Self-Healing Sync)
+  // 🌟 دالة الشفاء الذاتي الذكية (Self-Healing Sync)
   // ==========================================
   Future<void> _initializeWorkspace() async {
     final repository = context.read<CrmRepository>();
     try {
-      // 1. نرفع بيانات الهاتف أولاً! (لضمان أن أي تعديل قمنا به وأغلقنا التطبيق بسرعة، سيتم رفعه الآن)
-      await repository.syncAllToCloud();
+      // 1. نسأل السحابة أولاً لتجنب مسح بيانات هاتف آخر
+      final wasDownloaded = await repository.downloadIfCloudIsNewer();
       
-      // 2. ثم ننزل البيانات من السحابة (لو كان المستخدم قد أضاف بيانات من هاتف آخر)
-      await repository.downloadAllFromCloud();
+      // 2. إذا كنا نحن الأحدث، نرفع تعديلاتنا التي ربما قمنا بها بدون إنترنت
+      if (!wasDownloaded) {
+        await repository.syncAllToCloud();
+      }
     } catch (e) {
-      // إذا لم يكن هناك إنترنت، سيتجاهل الخطأ ويدخل للرئيسية ليعمل أوفلاين بسلام!
-      print("⚠️ تعذرت المزامنة المبدئية: $e");
+      print("⚠️ تعذرت المزامنة المبدئية (ربما لا يوجد إنترنت): $e");
     }
   }
 

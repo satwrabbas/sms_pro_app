@@ -1,7 +1,7 @@
 import 'package:local_storage_api/local_storage_api.dart';
 import 'package:cloud_storage_api/cloud_storage_api.dart'; // ☁️
 import 'package:drift/drift.dart' as drift;
-
+import 'package:shared_preferences/shared_preferences.dart'; // 🌟
 /// المدير المسؤول عن إدارة بيانات التطبيق (محلياً وسحابياً)
 class CrmRepository {
   const CrmRepository({
@@ -175,9 +175,13 @@ class CrmRepository {
     await _cloudStorage.syncContacts(contactsJson);
     await _cloudStorage.syncSchedules(schedulesJson);
     await _cloudStorage.syncMessages(messagesJson);
+    // 🌟 بعد رفع كل شيء بنجاح، نحدث وقت السحابة ووقت الهاتف
+    await _cloudStorage.updateCloudSyncTime();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('local_sync_time', DateTime.now().toUtc().toIso8601String());
   }
 
-  /// 📥 تنزيل البيانات من السحابة وحفظها في الهاتف (Drift)
+  /// 📥 تنزيل البيانات من السحابة وتحديثها في الهاتف (Upsert)
   Future<void> downloadAllFromCloud() async {
     // 1. جلب البيانات من السحابة
     final cloudGroups = await _cloudStorage.fetchGroups();
@@ -185,32 +189,32 @@ class CrmRepository {
     final cloudSchedules = await _cloudStorage.fetchSchedules();
     final cloudMessages = await _cloudStorage.fetchMessages();
 
-    // 2. حفظ المجموعات (نستخدم try-catch لتجاهل الخطأ إذا كانت المجموعة موجودة مسبقاً)
+    // 2. تحديث أو إضافة المجموعات
     for (var row in cloudGroups) {
       try {
-        await _localStorage.insertGroup(GroupsCompanion(
+        await _localStorage.upsertGroup(GroupsCompanion(
           id: drift.Value(row['id']),
           name: drift.Value(row['name']),
         ));
-      } catch (_) {} 
+      } catch (e) { print("خطأ مزامنة مجموعة: $e"); } 
     }
 
-    // 3. حفظ جهات الاتصال
+    // 3. تحديث أو إضافة جهات الاتصال
     for (var row in cloudContacts) {
       try {
-        await _localStorage.insertContact(ContactsCompanion(
+        await _localStorage.upsertContact(ContactsCompanion(
           id: drift.Value(row['id']),
           name: drift.Value(row['name']),
           phone: drift.Value(row['phone']),
           groupId: drift.Value(row['group_id']),
         ));
-      } catch (_) {}
+      } catch (e) { print("خطأ مزامنة عميل: $e"); }
     }
 
-    // 4. حفظ الحملات المجدولة
+    // 4. تحديث أو إضافة الحملات
     for (var row in cloudSchedules) {
       try {
-        await _localStorage.insertSchedule(SchedulesCompanion(
+        await _localStorage.upsertSchedule(SchedulesCompanion(
           id: drift.Value(row['id']),
           groupId: drift.Value(row['group_id']),
           message: drift.Value(row['message']),
@@ -220,21 +224,56 @@ class CrmRepository {
           lastSentDate: drift.Value(row['last_sent_date'] != null ? DateTime.parse(row['last_sent_date']) : null),
           isActive: drift.Value(row['is_active']),
         ));
-      } catch (_) {}
+      } catch (e) { print("خطأ مزامنة حملة: $e"); }
     }
 
-    // 5. حفظ سجلات الرسائل
+    // 5. تحديث أو إضافة السجلات
     for (var row in cloudMessages) {
       try {
-        await _localStorage.insertMessage(MessagesCompanion(
+        await _localStorage.upsertMessage(MessagesCompanion(
           id: drift.Value(row['id']),
           phone: drift.Value(row['phone']),
           body: drift.Value(row['body']),
           type: drift.Value(row['type']),
           messageDate: drift.Value(DateTime.parse(row['message_date'])),
         ));
-      } catch (_) {}
+      } catch (e) { print("خطأ مزامنة سجل: $e"); }
     }
+  }
+  /// 🌟 التنزيل الذكي (لا ينزل البيانات إلا إذا كانت السحابة أحدث من الهاتف)
+  /// تُرجع true إذا تم التنزيل، و false إذا كان الهاتف محدثاً بالفعل
+  Future<bool> downloadIfCloudIsNewer() async {
+    // 1. نسأل السحابة: متى كان آخر تحديث؟
+    final cloudTime = await _cloudStorage.getCloudSyncTime();
+    if (cloudTime == null) return false; // السحابة فارغة، لا تفعل شيئاً
+
+    // 2. نسأل الهاتف: متى كان آخر تحديث لك؟
+    final prefs = await SharedPreferences.getInstance();
+    final localTimeString = prefs.getString('local_sync_time');
+    DateTime? localTime;
+    if (localTimeString != null) {
+      localTime = DateTime.parse(localTimeString);
+    }
+
+    // 3. المقارنة الحاسمة ⚖️
+    // إذا كان الهاتف لم يُحدث أبداً، أو وقت السحابة أحدث من وقت الهاتف
+    if (localTime == null || cloudTime.isAfter(localTime)) {
+      print("🔄 السحابة أحدث! جاري مسح الهاتف وتنزيل النسخة النظيفة...");
+      
+      // مسح البيانات المحلية القديمة لمنع تضارب الـ IDs
+      await _localStorage.clearAllData();
+      
+      // تنزيل النسخة الطازجة
+      await downloadAllFromCloud();
+      
+      // تحديث وقت الهاتف ليطابق وقت السحابة
+      await prefs.setString('local_sync_time', cloudTime.toIso8601String());
+      
+      return true; // نعم، تم تحديث بيانات الهاتف
+    }
+
+    print("✅ الهاتف محدث بالفعل. لا حاجة للتنزيل.");
+    return false; // لم يتم تنزيل شيء
   }
 
   // --- دوال الحذف الجديدة (تتحدث مع الهاتف والسحابة معاً) ---

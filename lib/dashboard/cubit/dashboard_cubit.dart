@@ -133,7 +133,7 @@ class DashboardCubit extends Cubit<DashboardState> {
   }
 
   // ==========================================
-  // 3. 🔄 المزامنة الشاملة مع السحابة (رفع وتنزيل)
+  // 3. 🔄 المزامنة الشاملة الذكية
   // ==========================================
   Future<void> syncDataToCloud() async {
     if (state is DashboardLoaded) {
@@ -145,12 +145,19 @@ class DashboardCubit extends Cubit<DashboardState> {
         schedulesCount: currentState.schedulesCount,
         recentLogs: currentState.recentLogs,
         isEngineRunning: currentState.isEngineRunning, 
-        engineStatusMessage: '🔄 جاري المزامنة الشاملة...',
+        engineStatusMessage: '🔄 جاري المزامنة ...',
       ));
 
       try {
-        await _repository.syncAllToCloud();
-        await _repository.downloadAllFromCloud();
+        // 🌟 1. هل السحابة أحدث من هاتفي؟ (تنزيل)
+        final wasDownloaded = await _repository.downloadIfCloudIsNewer();
+        
+        // 🌟 2. إذا لم تكن السحابة أحدث، نرفع بيانات هاتفنا لضمان حفظ أي تعديل محلي (رفع)
+        if (!wasDownloaded) {
+          await _repository.syncAllToCloud();
+        }
+        
+        // 3. تحديث الأرقام في لوحة التحكم
         await loadDashboard(); 
         
         final newState = state as DashboardLoaded;
@@ -160,7 +167,9 @@ class DashboardCubit extends Cubit<DashboardState> {
           schedulesCount: newState.schedulesCount,
           recentLogs: newState.recentLogs,
           isEngineRunning: newState.isEngineRunning,
-          engineStatusMessage: '✅ تمت المزامنة بنجاح!',
+          engineStatusMessage: wasDownloaded 
+              ? '✅ تم استيراد التحديثات الجديدة من السحابة!' 
+              : '✅ تم رفع بيانات هاتفك للسحابة بنجاح!',
         ));
       } catch (e) {
         emit(DashboardLoaded(

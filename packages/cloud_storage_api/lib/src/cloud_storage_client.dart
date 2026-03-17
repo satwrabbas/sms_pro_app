@@ -121,4 +121,36 @@ class CloudStorageClient {
     // نحذف الصف الخاص بهذا المستخدم من جدول المفاتيح
     await _supabaseClient.from('user_tokens').delete().eq('user_id', _currentUserId!);
   }
+
+  // ==========================================
+  // 🌟 قسم تتبع تاريخ التحديثات (Sync Metadata)
+  // ==========================================
+
+  /// 1. تسجيل لحظة التعديل: نحدث الوقت في السحابة ليصبح (الآن)
+  Future<void> updateCloudSyncTime() async {
+    if (_currentUserId == null) return;
+    
+    await _supabaseClient.from('sync_metadata').upsert({
+      'user_id': _currentUserId,
+      // نستخدم التوقيت العالمي (UTC) لتوحيد الوقت بين كل الأجهزة
+      'last_updated_at': DateTime.now().toUtc().toIso8601String(), 
+    });
+  }
+
+  /// 2. قراءة لحظة التعديل: نسأل السحابة متى كان آخر تحديث؟
+  Future<DateTime?> getCloudSyncTime() async {
+    if (_currentUserId == null) return null;
+    
+    final response = await _supabaseClient
+        .from('sync_metadata')
+        .select('last_updated_at')
+        .eq('user_id', _currentUserId!)
+        .maybeSingle(); // نجلب صفا واحداً فقط (أو null إذا لم يكن موجوداً)
+
+    if (response != null && response['last_updated_at'] != null) {
+      return DateTime.parse(response['last_updated_at']);
+    }
+    
+    return null;
+  }
 }
