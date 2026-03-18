@@ -1,7 +1,7 @@
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:crm_repository/crm_repository.dart';
-import 'package:local_storage_api/local_storage_api.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_contacts/flutter_contacts.dart' as phone_contacts;
+import 'package:local_storage_api/local_storage_api.dart';
 
 part 'contacts_state.dart';
 
@@ -54,8 +54,8 @@ class ContactsCubit extends Cubit<ContactsState> {
           },
         );
 
-        final List<Map<String, String>> formattedContacts =[];
-        for (var c in contactsFromPhone) {
+        final formattedContacts =<Map<String, String>>[];
+        for (final c in contactsFromPhone) {
           if (c.phones.isNotEmpty) {
             formattedContacts.add({
               'name': c.displayName ?? 'بدون اسم',

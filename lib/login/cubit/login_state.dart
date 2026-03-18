@@ -9,6 +9,6 @@ class LoginLoading extends LoginState {} // جاري تسجيل الدخول
 class LoginSuccess extends LoginState {} // تم بنجاح
 
 class LoginError extends LoginState {
-  final String message;
   LoginError({required this.message});
+  final String message;
 }

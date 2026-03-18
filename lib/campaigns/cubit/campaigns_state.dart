@@ -6,12 +6,16 @@ class CampaignsInitial extends CampaignsState {}
 
 class CampaignsLoading extends CampaignsState {}
 
-// هذه الحالة تحمل قائمتين: المجموعات والحملات المجدولة
 class CampaignsLoaded extends CampaignsState {
   final List<Group> groups;
   final List<Schedule> schedules;
+  final List<Map<String, dynamic>> devices; // 🌟 قائمة الأجهزة المسجلة
 
-  CampaignsLoaded({required this.groups, required this.schedules});
+  CampaignsLoaded({
+    required this.groups, 
+    required this.schedules, 
+    required this.devices, // 🌟
+  });
 }
 
 class CampaignsError extends CampaignsState {

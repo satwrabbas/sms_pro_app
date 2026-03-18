@@ -18,30 +18,62 @@ class DashboardPage extends StatelessWidget {
 class DashboardView extends StatelessWidget {
   const DashboardView({super.key});
 
+  // 🌟 نافذة ذكية تطلب اسم الجهاز قبل ربطه
+  void _showDeviceNameDialog(BuildContext context) {
+    final nameController = TextEditingController();
+    final cubit = context.read<DashboardCubit>();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('تسجيل جهاز جديد 📱'),
+        content: TextField(
+          controller: nameController,
+          decoration: const InputDecoration(
+            labelText: 'اسم الجهاز (مثال: هاتف المبيعات 1)',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions:[
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext), 
+            child: const Text('إلغاء', style: TextStyle(color: Colors.red))
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (nameController.text.isNotEmpty) {
+                // إرسال الاسم للكيوبيت ليبدأ عملية الربط
+                cubit.toggleEngine(deviceName: nameController.text.trim());
+                Navigator.pop(dialogContext);
+              }
+            },
+            child: const Text('تأكيد وربط'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('لوحة التحكم (CRM)'),
         actions:[
-          // 🌟 زر المزامنة السحابية الجديد
           BlocBuilder<DashboardCubit, DashboardState>(
             builder: (context, state) {
-              final isRunning = state is DashboardLoaded && state.isEngineRunning;
               return IconButton(
                 icon: const Icon(Icons.cloud_upload, color: Colors.white),
-                tooltip: 'رفع النسخة الاحتياطية للسحابة',
-                onPressed: isRunning
-                    ? null // تعطيل الزر إذا كانت هناك عملية تعمل
-                    : () {
-                        context.read<DashboardCubit>().syncDataToCloud();
-                      },
+                tooltip: 'المزامنة اليدوية',
+                onPressed: () {
+                  context.read<DashboardCubit>().syncDataToCloud();
+                },
               );
             },
           ),
         ],
       ),
-      // BlocListener لعرض نوافذ الـ SnackBar عند تشغيل المحرك
       body: BlocConsumer<DashboardCubit, DashboardState>(
         listener: (context, state) {
           if (state is DashboardLoaded && state.engineStatusMessage != null) {
@@ -72,41 +104,39 @@ class DashboardView extends StatelessWidget {
                   ),
                   const SizedBox(height: 32),
 
-                  // 2. زر تشغيل المحرك السحري
-                  // 2. زر تشغيل وإيقاف المحرك (مع الأنيميشن)
-                // 2. زر ربط الهاتف بالسحابة (FCM)
+                  // 2. زر ربط الهاتف بالسحابة (FCM)
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(15),
                       boxShadow: state.isEngineRunning 
                           ?[
-                              BoxShadow(
-                                color: Colors.greenAccent.withOpacity(0.6),
-                                blurRadius: 20,
-                                spreadRadius: 5,
-                              )
+                              BoxShadow(color: Colors.greenAccent.withOpacity(0.6), blurRadius: 20, spreadRadius: 5)
                             ]
                           :[],
                     ),
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        context.read<DashboardCubit>().toggleEngine();
+                        // 🌟 إذا كان غير متصل، نظهر نافذة الاسم. وإذا كان متصل، نفك الارتباط مباشرة
+                        if (!state.isEngineRunning) {
+                          _showDeviceNameDialog(context);
+                        } else {
+                          context.read<DashboardCubit>().toggleEngine();
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 24),
-                        backgroundColor: state.isEngineRunning ? Colors.green[800] : Colors.blue[800], // غيرنا اللون للأزرق ليدل على السحابة
+                        backgroundColor: state.isEngineRunning ? Colors.green[800] : Colors.blue[800], 
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                       ),
-                      // 🌟 تغيير الأيقونات والنصوص لتطابق الواقع الهندسي
                       icon: state.isEngineRunning 
                           ? const RadarAnimation() 
                           : const Icon(Icons.phonelink_ring, size: 32),
                       label: Text(
                         state.isEngineRunning 
-                            ? 'الهاتف متصل بالسحابة وجاهز للإرسال 📡' 
-                            : 'ربط هذا الهاتف لاستقبال أوامر الأتمتة ☁️📱', 
+                            ? 'الهاتف مسجل وجاهز للإرسال 📡' 
+                            : 'تسجيل هذا الهاتف للبدء ☁️📱', 
                         style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)
                       ),
                     ),
@@ -142,7 +172,6 @@ class DashboardView extends StatelessWidget {
     );
   }
 
-  // أداة صغيرة لبناء كروت الإحصائيات (Clean Code)
   Widget _buildStatCard(String title, String count, IconData icon, Color color) {
     return Expanded(
       child: Card(
@@ -165,30 +194,24 @@ class DashboardView extends StatelessWidget {
   }
 }
 
-
 // 🌟 أنيميشن "الرادار النابض"
 class RadarAnimation extends StatefulWidget {
   const RadarAnimation({super.key});
-
   @override
   State<RadarAnimation> createState() => _RadarAnimationState();
 }
-
 class _RadarAnimationState extends State<RadarAnimation> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(vsync: this, duration: const Duration(seconds: 1))..repeat(reverse: true);
   }
-
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     return FadeTransition(

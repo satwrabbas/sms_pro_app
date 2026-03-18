@@ -1,9 +1,9 @@
+import 'package:cloud_storage_api/cloud_storage_api.dart';
+import 'package:crm_repository/crm_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:crm_repository/crm_repository.dart';
-import 'package:cloud_storage_api/cloud_storage_api.dart'; 
-import 'package:my_pro_app/login/view/login_page.dart';
 import 'package:my_pro_app/home/view/home_page.dart';
+import 'package:my_pro_app/login/view/login_page.dart';
 
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
@@ -66,7 +66,7 @@ class _WorkspaceInitializerState extends State<WorkspaceInitializer> {
         await repository.syncAllToCloud();
       }
     } catch (e) {
-      print("⚠️ تعذرت المزامنة المبدئية (ربما لا يوجد إنترنت): $e");
+      print('⚠️ تعذرت المزامنة المبدئية (ربما لا يوجد إنترنت): $e');
     }
   }
 

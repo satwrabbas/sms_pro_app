@@ -1,14 +1,15 @@
 import 'dart:ui'; // 🌟 1. استدعاء مكتبة الـ UI الضرورية لعمل الخلفية
-import 'package:flutter/widgets.dart';
-import 'package:local_storage_api/local_storage_api.dart';
-import 'package:cloud_storage_api/cloud_storage_api.dart'; 
-import 'package:supabase_flutter/supabase_flutter.dart'; 
-import 'package:my_pro_app/app/app.dart';
-import 'package:my_pro_app/bootstrap.dart';
+
+import 'package:cloud_storage_api/cloud_storage_api.dart';
+import 'package:drift/drift.dart' as drift;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/widgets.dart';
+import 'package:local_storage_api/local_storage_api.dart';
+import 'package:my_pro_app/app/app.dart';
+import 'package:my_pro_app/bootstrap.dart';
 import 'package:my_pro_app/firebase_options.dart';
-import 'package:drift/drift.dart' as drift;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:telephony/telephony.dart';
 
 // ==========================================
@@ -20,19 +21,19 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   
-  print("👻 إشارة صامتة وصلت من السحابة!");
+  print('👻 إشارة صامتة وصلت من السحابة!');
 
   try {
     final data = message.data;
-    final String? groupIdString = data['group_id']?.toString();
-    final String? smsBody = data['message']?.toString();
+    final groupIdString = data['group_id']?.toString();
+    final smsBody = data['message']?.toString();
 
     if (groupIdString == null || smsBody == null) {
-      print("❌ بيانات الحملة ناقصة!");
+      print('❌ بيانات الحملة ناقصة!');
       return;
     }
 
-    final int groupId = int.parse(groupIdString);
+    final groupId = int.parse(groupIdString);
 
     final database = AppDatabase();
     final telephony = Telephony.instance;
@@ -42,9 +43,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
     if (targetContacts.isEmpty) return;
 
-    print("🚀 جاري إرسال $smsBody إلى ${targetContacts.length} عميل...");
+    print('🚀 جاري إرسال $smsBody إلى ${targetContacts.length} عميل...');
 
-    for (var contact in targetContacts) {
+    for (final contact in targetContacts) {
       try {
         // 🌟 1. إطلاق الرسالة (Fire and Forget) بدون await
         telephony.sendSms(to: contact.phone, message: smsBody);
@@ -57,18 +58,18 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           messageDate: drift.Value(DateTime.now()),
         ));
         
-        print("✅ تم إرسال وحفظ رسالة الرقم: ${contact.phone}");
+        print('✅ تم إرسال وحفظ رسالة الرقم: ${contact.phone}');
       } catch (e) {
-        print("❌ خطأ في رقم ${contact.phone}: $e");
+        print('❌ خطأ في رقم ${contact.phone}: $e');
       }
 
       await Future.delayed(const Duration(seconds: 1)); // حماية الشريحة
     }
 
-    print("✅✅ تمت مهمة الشبح بالكامل بنجاح! العودة للنوم 💤");
+    print('✅✅ تمت مهمة الشبح بالكامل بنجاح! العودة للنوم 💤');
 
   } catch (e) {
-    print("❌ حدث خطأ في مهمة الخلفية: $e");
+    print('❌ حدث خطأ في مهمة الخلفية: $e');
   }
 }
 
@@ -85,8 +86,8 @@ void main() async {
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   // 🌟 3. تسجيل دالة الاستماع في الواجهة (والتطبيق مفتوح)
-  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-    print("🔔 إشارة وصلت والتطبيق مفتوح!");
+  FirebaseMessaging.onMessage.listen((message) {
+    print('🔔 إشارة وصلت والتطبيق مفتوح!');
     // نقوم بتشغيل نفس دالة الشبح لترسل الرسائل فوراً
     _firebaseMessagingBackgroundHandler(message);
   });

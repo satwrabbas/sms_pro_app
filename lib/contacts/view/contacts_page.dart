@@ -1,8 +1,8 @@
+import 'package:crm_repository/crm_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:crm_repository/crm_repository.dart';
 import 'package:local_storage_api/local_storage_api.dart';
-import '../cubit/contacts_cubit.dart';
+import 'package:my_pro_app/contacts/cubit/contacts_cubit.dart';
 
 class ContactsPage extends StatelessWidget {
   const ContactsPage({super.key});
@@ -69,7 +69,7 @@ class _ContactsViewState extends State<ContactsView> {
                     cubit.assignGroup(contact, g.id);
                     Navigator.pop(context);
                   },
-                )).toList(),
+                )),
               ],
             ),
           ),
@@ -139,7 +139,7 @@ class _ContactsViewState extends State<ContactsView> {
               children:[
                 // 🌟 مربع البحث الجميل
                 Padding(
-                  padding: const EdgeInsets.all(12.0),
+                  padding: const EdgeInsets.all(12),
                   child: TextField(
                     controller: _searchController,
                     onChanged: (value) {
@@ -181,7 +181,7 @@ class _ContactsViewState extends State<ContactsView> {
                           itemBuilder: (context, index) {
                             final contact = filteredContacts[index];
                             
-                            String groupName = 'بدون مجموعة';
+                            var groupName = 'بدون مجموعة';
                             Color groupColor = Colors.grey;
                             if (contact.groupId != null) {
                               try {

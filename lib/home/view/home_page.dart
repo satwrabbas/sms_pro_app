@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../cubit/home_cubit.dart';
 import 'package:my_pro_app/campaigns/view/campaigns_page.dart';
 // استدعاء شاشة جهات الاتصال التي صنعناها
-import 'package:my_pro_app/contacts/view/contacts_page.dart'; 
+import 'package:my_pro_app/contacts/view/contacts_page.dart';
 import 'package:my_pro_app/dashboard/view/dashboard_page.dart';
+import 'package:my_pro_app/home/cubit/home_cubit.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -27,7 +27,7 @@ class HomeView extends StatelessWidget {
     final selectedTab = context.watch<HomeCubit>().state;
 
     // قائمة الشاشات (سنضيف الشاشات الأخرى لاحقاً)
-    final List<Widget> pages =[
+    final pages =<Widget>[
    // 1. لوحة التحكم (🌟 تم استبدالها)
    const DashboardPage(),
    

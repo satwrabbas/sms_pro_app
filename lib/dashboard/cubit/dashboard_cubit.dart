@@ -3,9 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:crm_repository/crm_repository.dart';
 import 'package:local_storage_api/local_storage_api.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-// 🌟 استدعاء حزمة الذاكرة الدائمة
-import 'package:shared_preferences/shared_preferences.dart'; 
-
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:telephony/telephony.dart';
+import 'package:android_id/android_id.dart'; // 🌟
 part 'dashboard_state.dart';
 
 class DashboardCubit extends Cubit<DashboardState> {
@@ -14,9 +14,10 @@ class DashboardCubit extends Cubit<DashboardState> {
         super(DashboardLoading());
 
   final CrmRepository _repository;
+  final Telephony telephony = Telephony.instance;
 
   // ==========================================
-  // 1. تحميل بيانات لوحة التحكم (وقراءة حالة الزر المحفوظة)
+  // 1. تحميل بيانات لوحة التحكم
   // ==========================================
   Future<void> loadDashboard() async {
     try {
@@ -25,7 +26,6 @@ class DashboardCubit extends Cubit<DashboardState> {
       final schedules = await _repository.getSchedules();
       final logs = await _repository.getMessageLogs();
 
-      // 🌟 السحر هنا: قراءة حالة المحرك من ذاكرة الهاتف
       final prefs = await SharedPreferences.getInstance();
       final isRunning = prefs.getBool('is_engine_running') ?? false;
 
@@ -34,7 +34,7 @@ class DashboardCubit extends Cubit<DashboardState> {
         groupsCount: groups.length,
         schedulesCount: schedules.length,
         recentLogs: logs,
-        isEngineRunning: isRunning, // 🌟 نمرر الحالة المحفوظة
+        isEngineRunning: isRunning,
       ));
     } catch (e) {
       // تجاهل الأخطاء البسيطة
@@ -42,41 +42,55 @@ class DashboardCubit extends Cubit<DashboardState> {
   }
 
   // ==========================================
-  // 2. 🌟 ربط/فصل الهاتف بالسحابة (FCM) وحفظ الحالة
+  // 2. 🌟 تسجيل الجهاز في السحابة أو فك ارتباطه
   // ==========================================
-  Future<void> toggleEngine() async {
+  Future<void> toggleEngine({String? deviceName}) async {
     if (state is DashboardLoaded) {
       final currentState = state as DashboardLoaded;
-      final isRunning = !currentState.isEngineRunning; // عكس الحالة الحالية
+      final isRunning = !currentState.isEngineRunning;
 
       emit(DashboardLoaded(
         contactsCount: currentState.contactsCount,
         groupsCount: currentState.groupsCount,
         schedulesCount: currentState.schedulesCount,
         recentLogs: currentState.recentLogs,
-        isEngineRunning: isRunning,
+        isEngineRunning: currentState.isEngineRunning, // ننتظر حتى ننجح
         engineStatusMessage: isRunning 
-            ? '🔄 جاري الاتصال بالسحابة...' 
-            : '🛑 تم فك ارتباط الهاتف.',
+            ? '🔄 جاري تسجيل الجهاز في السحابة...' 
+            : '🛑 جاري فك ارتباط هذا الجهاز...',
       ));
 
       final prefs = await SharedPreferences.getInstance();
 
-      if (isRunning) {
+      if (isRunning && deviceName != null) {
         try {
-          // 1. طلب الصلاحية
-          FirebaseMessaging messaging = FirebaseMessaging.instance;
-          await messaging.requestPermission(
-            alert: false, badge: false, sound: false, provisional: false,
-          );
-
-          // 2. جلب المفتاح وإرساله للسحابة
-          final fcmToken = await messaging.getToken();
-          if (fcmToken != null) {
-            await _repository.saveFcmToken(fcmToken);
+          // 1. الفحص الصارم: طلب صلاحية الـ SMS
+          if (Platform.isAndroid) {
+            final smsGranted = await telephony.requestPhoneAndSmsPermissions;
+            if (smsGranted == null || !smsGranted) {
+              throw 'يجب الموافقة على صلاحية إرسال الـ SMS لكي يعمل النظام!';
+            }
           }
 
-          // 🌟 3. حفظ الحالة في الذاكرة الدائمة (لكي لا تُنسى أبداً)
+          // 2. طلب صلاحية الإشعارات (للفايربيس) وجلب الرمز
+          FirebaseMessaging messaging = FirebaseMessaging.instance;
+          await messaging.requestPermission(alert: false, badge: false, sound: false, provisional: false);
+          // 3. جلب المفتاح والبصمة وإرسالهم للسحابة
+          final fcmToken = await messaging.getToken();
+          
+          // 🌟 جلب البصمة المستحيلة التغيير (Android ID)
+          const androidIdPlugin = AndroidId();
+          final String hardwareId = await androidIdPlugin.getId() ?? 'unknown_device_${DateTime.now().millisecondsSinceEpoch}';
+
+          if (fcmToken != null) {
+            // 🌟 نمرر البصمة لدالة التسجيل (لم نعد نحتاج لتمرير existingId من الذاكرة لأنه يُمسح عند الحذف)
+            final newDeviceId = await _repository.registerDevice(deviceName, fcmToken, hardwareId);
+            
+            if (newDeviceId != null) {
+              await prefs.setString('registered_device_id', newDeviceId);
+            }
+          }
+
           await prefs.setBool('is_engine_running', true);
 
           emit(DashboardLoaded(
@@ -84,12 +98,11 @@ class DashboardCubit extends Cubit<DashboardState> {
             groupsCount: currentState.groupsCount,
             schedulesCount: currentState.schedulesCount,
             recentLogs: currentState.recentLogs,
-            isEngineRunning: true,
-            engineStatusMessage: '📡 الهاتف متصل بالسحابة وجاهز للإرسال!',
+            isEngineRunning: true, 
+            engineStatusMessage: '📡 تم تسجيل جهاز ($deviceName) بنجاح!',
           ));
 
         } catch (e) {
-          // في حال الفشل، نعيد الزر لحالته المغلقة
           await prefs.setBool('is_engine_running', false);
           emit(DashboardLoaded(
             contactsCount: currentState.contactsCount,
@@ -97,16 +110,19 @@ class DashboardCubit extends Cubit<DashboardState> {
             schedulesCount: currentState.schedulesCount,
             recentLogs: currentState.recentLogs,
             isEngineRunning: false,
-            engineStatusMessage: '❌ فشل الاتصال بالسحابة: $e',
+            engineStatusMessage: '❌ فشل تسجيل الجهاز: $e',
           ));
         }
       } else {
         // 🛑 المستخدم قرر فك ارتباط هذا الهاتف
         try {
-          // 1. مسح المفتاح من السحابة (لن تصله أي أوامر بعد الآن)
-          await _repository.removeFcmToken();
+          final existingId = prefs.getString('registered_device_id');
+          if (existingId != null) {
+             // مسح الجهاز من السحابة تماماً
+            await _repository.removeDevice(existingId);
+            await prefs.remove('registered_device_id'); 
+          }
           
-          // 2. حفظ الحالة الجديدة في ذاكرة الهاتف
           await prefs.setBool('is_engine_running', false);
 
           emit(DashboardLoaded(
@@ -118,14 +134,13 @@ class DashboardCubit extends Cubit<DashboardState> {
             engineStatusMessage: '🛑 تم فك ارتباط الهاتف بنجاح. لن يرسل رسائل بعد الآن.',
           ));
         } catch (e) {
-          // إذا فشل الاتصال بالإنترنت أثناء فك الارتباط
           emit(DashboardLoaded(
             contactsCount: currentState.contactsCount,
             groupsCount: currentState.groupsCount,
             schedulesCount: currentState.schedulesCount,
             recentLogs: currentState.recentLogs,
-            isEngineRunning: true, // نتركه متصلاً لأننا لم ننجح في إخبار السحابة
-            engineStatusMessage: '❌ فشل فك الارتباط، تأكد من اتصال الإنترنت.',
+            isEngineRunning: true,
+            engineStatusMessage: '❌ فشل فك الارتباط: $e',
           ));
         }
       }
@@ -145,19 +160,16 @@ class DashboardCubit extends Cubit<DashboardState> {
         schedulesCount: currentState.schedulesCount,
         recentLogs: currentState.recentLogs,
         isEngineRunning: currentState.isEngineRunning, 
-        engineStatusMessage: '🔄 جاري المزامنة ...',
+        engineStatusMessage: '🔄 جاري المزامنة الذكية...',
       ));
 
       try {
-        // 🌟 1. هل السحابة أحدث من هاتفي؟ (تنزيل)
         final wasDownloaded = await _repository.downloadIfCloudIsNewer();
         
-        // 🌟 2. إذا لم تكن السحابة أحدث، نرفع بيانات هاتفنا لضمان حفظ أي تعديل محلي (رفع)
         if (!wasDownloaded) {
           await _repository.syncAllToCloud();
         }
         
-        // 3. تحديث الأرقام في لوحة التحكم
         await loadDashboard(); 
         
         final newState = state as DashboardLoaded;

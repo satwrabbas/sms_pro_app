@@ -1,3 +1,3 @@
-library local_storage_api;
+library;
 
 export 'src/app_database.dart';

@@ -1,7 +1,7 @@
+import 'package:crm_repository/crm_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:crm_repository/crm_repository.dart';
-import '../cubit/login_cubit.dart';
+import 'package:my_pro_app/login/cubit/login_cubit.dart';
 
 class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
@@ -56,7 +56,7 @@ class _LoginViewState extends State<LoginView> {
 
           return Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.all(24),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,

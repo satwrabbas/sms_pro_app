@@ -100,28 +100,62 @@ class CloudStorageClient {
   }
 
   // ==========================================
-  // 🌟 حفظ مفتاح الهاتف (FCM Token) في السحابة
+  // 🌟 قسم إدارة الأجهزة (Device Management)
   // ==========================================
-  Future<void> saveFcmToken(String token) async {
-    if (_currentUserId == null) return;
-    
-    await _supabaseClient.from('user_tokens').upsert({
+
+/// 🌟 تسجيل الجهاز أو استعادته من الموت باستخدام بصمة الأندرويد (Hardware ID)
+  Future<String?> registerDevice({
+    required String deviceName, 
+    required String fcmToken, 
+    required String hardwareId, // 🌟 البصمة الجديدة
+  }) async {
+    if (_currentUserId == null) return null;
+
+    final data = {
       'user_id': _currentUserId,
-      'fcm_token': token,
-      'updated_at': DateTime.now().toIso8601String(),
-    });
-  }
+      'device_name': deviceName,
+      'fcm_token': fcmToken,
+      'hardware_id': hardwareId, // 🌟 نحفظ البصمة
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    };
 
-  // ==========================================
-  // 🗑️ حذف مفتاح الهاتف (عند فك الارتباط أو تسجيل الخروج)
-  // ==========================================
-  Future<void> removeFcmToken() async {
+    try {
+      // 1. نسأل السحابة: هل يوجد جهاز يحمل نفس هذه البصمة لهذا المستخدم؟
+      final existingDevice = await _supabaseClient
+          .from('user_tokens')
+          .select('device_id')
+          .eq('user_id', _currentUserId!)
+          .eq('hardware_id', hardwareId) // 🌟 البحث بالبصمة المستحيل تغييرها!
+          .maybeSingle();
+
+      if (existingDevice != null) {
+        // 🌟 الهاتف عاد من الموت (حُذف وتمت إعادة تثبيته)!
+        // نأخذ الـ ID القديم لكي لا تضيع الحملات المربوطة به، ونحدث الـ FCM Token فقط
+        final oldId = existingDevice['device_id'];
+        data['device_id'] = oldId;
+        
+        await _supabaseClient.from('user_tokens').upsert(data);
+        return oldId as String; 
+      } else {
+        // 2. هاتف جديد كلياً
+        final response = await _supabaseClient.from('user_tokens').insert(data).select().single();
+        return response['device_id'] as String;
+      }
+    } catch (e) {
+      throw 'حدث خطأ في تسجيل الجهاز: $e';
+    }
+  }
+  /// حذف جهاز من السحابة (فك الارتباط)
+  Future<void> removeDevice(String deviceId) async {
     if (_currentUserId == null) return;
-    
-    // نحذف الصف الخاص بهذا المستخدم من جدول المفاتيح
-    await _supabaseClient.from('user_tokens').delete().eq('user_id', _currentUserId!);
+    await _supabaseClient.from('user_tokens').delete().eq('device_id', deviceId);
   }
 
+  /// جلب كل الأجهزة المربوطة بهذا الحساب (لنختار منها عند إنشاء حملة)
+  Future<List<Map<String, dynamic>>> fetchDevices() async {
+    if (_currentUserId == null) return[];
+    return await _supabaseClient.from('user_tokens').select().eq('user_id', _currentUserId!);
+  }
   // ==========================================
   // 🌟 قسم تتبع تاريخ التحديثات (Sync Metadata)
   // ==========================================

@@ -570,6 +570,17 @@ class $SchedulesTable extends Schedules
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _targetDeviceIdMeta = const VerificationMeta(
+    'targetDeviceId',
+  );
+  @override
+  late final GeneratedColumn<String> targetDeviceId = GeneratedColumn<String>(
+    'target_device_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _lastSentDateMeta = const VerificationMeta(
     'lastSentDate',
   );
@@ -604,6 +615,7 @@ class $SchedulesTable extends Schedules
     sendDay,
     sendHour,
     sendMinute,
+    targetDeviceId,
     lastSentDate,
     isActive,
   ];
@@ -658,6 +670,15 @@ class $SchedulesTable extends Schedules
         sendMinute.isAcceptableOrUnknown(data['send_minute']!, _sendMinuteMeta),
       );
     }
+    if (data.containsKey('target_device_id')) {
+      context.handle(
+        _targetDeviceIdMeta,
+        targetDeviceId.isAcceptableOrUnknown(
+          data['target_device_id']!,
+          _targetDeviceIdMeta,
+        ),
+      );
+    }
     if (data.containsKey('last_sent_date')) {
       context.handle(
         _lastSentDateMeta,
@@ -706,6 +727,10 @@ class $SchedulesTable extends Schedules
         DriftSqlType.int,
         data['${effectivePrefix}send_minute'],
       )!,
+      targetDeviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}target_device_id'],
+      ),
       lastSentDate: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}last_sent_date'],
@@ -730,6 +755,7 @@ class Schedule extends DataClass implements Insertable<Schedule> {
   final int sendDay;
   final int sendHour;
   final int sendMinute;
+  final String? targetDeviceId;
   final DateTime? lastSentDate;
   final bool isActive;
   const Schedule({
@@ -739,6 +765,7 @@ class Schedule extends DataClass implements Insertable<Schedule> {
     required this.sendDay,
     required this.sendHour,
     required this.sendMinute,
+    this.targetDeviceId,
     this.lastSentDate,
     required this.isActive,
   });
@@ -751,6 +778,9 @@ class Schedule extends DataClass implements Insertable<Schedule> {
     map['send_day'] = Variable<int>(sendDay);
     map['send_hour'] = Variable<int>(sendHour);
     map['send_minute'] = Variable<int>(sendMinute);
+    if (!nullToAbsent || targetDeviceId != null) {
+      map['target_device_id'] = Variable<String>(targetDeviceId);
+    }
     if (!nullToAbsent || lastSentDate != null) {
       map['last_sent_date'] = Variable<DateTime>(lastSentDate);
     }
@@ -766,6 +796,9 @@ class Schedule extends DataClass implements Insertable<Schedule> {
       sendDay: Value(sendDay),
       sendHour: Value(sendHour),
       sendMinute: Value(sendMinute),
+      targetDeviceId: targetDeviceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(targetDeviceId),
       lastSentDate: lastSentDate == null && nullToAbsent
           ? const Value.absent()
           : Value(lastSentDate),
@@ -785,6 +818,7 @@ class Schedule extends DataClass implements Insertable<Schedule> {
       sendDay: serializer.fromJson<int>(json['sendDay']),
       sendHour: serializer.fromJson<int>(json['sendHour']),
       sendMinute: serializer.fromJson<int>(json['sendMinute']),
+      targetDeviceId: serializer.fromJson<String?>(json['targetDeviceId']),
       lastSentDate: serializer.fromJson<DateTime?>(json['lastSentDate']),
       isActive: serializer.fromJson<bool>(json['isActive']),
     );
@@ -799,6 +833,7 @@ class Schedule extends DataClass implements Insertable<Schedule> {
       'sendDay': serializer.toJson<int>(sendDay),
       'sendHour': serializer.toJson<int>(sendHour),
       'sendMinute': serializer.toJson<int>(sendMinute),
+      'targetDeviceId': serializer.toJson<String?>(targetDeviceId),
       'lastSentDate': serializer.toJson<DateTime?>(lastSentDate),
       'isActive': serializer.toJson<bool>(isActive),
     };
@@ -811,6 +846,7 @@ class Schedule extends DataClass implements Insertable<Schedule> {
     int? sendDay,
     int? sendHour,
     int? sendMinute,
+    Value<String?> targetDeviceId = const Value.absent(),
     Value<DateTime?> lastSentDate = const Value.absent(),
     bool? isActive,
   }) => Schedule(
@@ -820,6 +856,9 @@ class Schedule extends DataClass implements Insertable<Schedule> {
     sendDay: sendDay ?? this.sendDay,
     sendHour: sendHour ?? this.sendHour,
     sendMinute: sendMinute ?? this.sendMinute,
+    targetDeviceId: targetDeviceId.present
+        ? targetDeviceId.value
+        : this.targetDeviceId,
     lastSentDate: lastSentDate.present ? lastSentDate.value : this.lastSentDate,
     isActive: isActive ?? this.isActive,
   );
@@ -833,6 +872,9 @@ class Schedule extends DataClass implements Insertable<Schedule> {
       sendMinute: data.sendMinute.present
           ? data.sendMinute.value
           : this.sendMinute,
+      targetDeviceId: data.targetDeviceId.present
+          ? data.targetDeviceId.value
+          : this.targetDeviceId,
       lastSentDate: data.lastSentDate.present
           ? data.lastSentDate.value
           : this.lastSentDate,
@@ -849,6 +891,7 @@ class Schedule extends DataClass implements Insertable<Schedule> {
           ..write('sendDay: $sendDay, ')
           ..write('sendHour: $sendHour, ')
           ..write('sendMinute: $sendMinute, ')
+          ..write('targetDeviceId: $targetDeviceId, ')
           ..write('lastSentDate: $lastSentDate, ')
           ..write('isActive: $isActive')
           ..write(')'))
@@ -863,6 +906,7 @@ class Schedule extends DataClass implements Insertable<Schedule> {
     sendDay,
     sendHour,
     sendMinute,
+    targetDeviceId,
     lastSentDate,
     isActive,
   );
@@ -876,6 +920,7 @@ class Schedule extends DataClass implements Insertable<Schedule> {
           other.sendDay == this.sendDay &&
           other.sendHour == this.sendHour &&
           other.sendMinute == this.sendMinute &&
+          other.targetDeviceId == this.targetDeviceId &&
           other.lastSentDate == this.lastSentDate &&
           other.isActive == this.isActive);
 }
@@ -887,6 +932,7 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
   final Value<int> sendDay;
   final Value<int> sendHour;
   final Value<int> sendMinute;
+  final Value<String?> targetDeviceId;
   final Value<DateTime?> lastSentDate;
   final Value<bool> isActive;
   const SchedulesCompanion({
@@ -896,6 +942,7 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
     this.sendDay = const Value.absent(),
     this.sendHour = const Value.absent(),
     this.sendMinute = const Value.absent(),
+    this.targetDeviceId = const Value.absent(),
     this.lastSentDate = const Value.absent(),
     this.isActive = const Value.absent(),
   });
@@ -906,6 +953,7 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
     required int sendDay,
     this.sendHour = const Value.absent(),
     this.sendMinute = const Value.absent(),
+    this.targetDeviceId = const Value.absent(),
     this.lastSentDate = const Value.absent(),
     this.isActive = const Value.absent(),
   }) : groupId = Value(groupId),
@@ -918,6 +966,7 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
     Expression<int>? sendDay,
     Expression<int>? sendHour,
     Expression<int>? sendMinute,
+    Expression<String>? targetDeviceId,
     Expression<DateTime>? lastSentDate,
     Expression<bool>? isActive,
   }) {
@@ -928,6 +977,7 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
       if (sendDay != null) 'send_day': sendDay,
       if (sendHour != null) 'send_hour': sendHour,
       if (sendMinute != null) 'send_minute': sendMinute,
+      if (targetDeviceId != null) 'target_device_id': targetDeviceId,
       if (lastSentDate != null) 'last_sent_date': lastSentDate,
       if (isActive != null) 'is_active': isActive,
     });
@@ -940,6 +990,7 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
     Value<int>? sendDay,
     Value<int>? sendHour,
     Value<int>? sendMinute,
+    Value<String?>? targetDeviceId,
     Value<DateTime?>? lastSentDate,
     Value<bool>? isActive,
   }) {
@@ -950,6 +1001,7 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
       sendDay: sendDay ?? this.sendDay,
       sendHour: sendHour ?? this.sendHour,
       sendMinute: sendMinute ?? this.sendMinute,
+      targetDeviceId: targetDeviceId ?? this.targetDeviceId,
       lastSentDate: lastSentDate ?? this.lastSentDate,
       isActive: isActive ?? this.isActive,
     );
@@ -976,6 +1028,9 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
     if (sendMinute.present) {
       map['send_minute'] = Variable<int>(sendMinute.value);
     }
+    if (targetDeviceId.present) {
+      map['target_device_id'] = Variable<String>(targetDeviceId.value);
+    }
     if (lastSentDate.present) {
       map['last_sent_date'] = Variable<DateTime>(lastSentDate.value);
     }
@@ -994,6 +1049,7 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
           ..write('sendDay: $sendDay, ')
           ..write('sendHour: $sendHour, ')
           ..write('sendMinute: $sendMinute, ')
+          ..write('targetDeviceId: $targetDeviceId, ')
           ..write('lastSentDate: $lastSentDate, ')
           ..write('isActive: $isActive')
           ..write(')'))
@@ -1979,6 +2035,7 @@ typedef $$SchedulesTableCreateCompanionBuilder =
       required int sendDay,
       Value<int> sendHour,
       Value<int> sendMinute,
+      Value<String?> targetDeviceId,
       Value<DateTime?> lastSentDate,
       Value<bool> isActive,
     });
@@ -1990,6 +2047,7 @@ typedef $$SchedulesTableUpdateCompanionBuilder =
       Value<int> sendDay,
       Value<int> sendHour,
       Value<int> sendMinute,
+      Value<String?> targetDeviceId,
       Value<DateTime?> lastSentDate,
       Value<bool> isActive,
     });
@@ -2048,6 +2106,11 @@ class $$SchedulesTableFilterComposer
 
   ColumnFilters<int> get sendMinute => $composableBuilder(
     column: $table.sendMinute,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get targetDeviceId => $composableBuilder(
+    column: $table.targetDeviceId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2119,6 +2182,11 @@ class $$SchedulesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get targetDeviceId => $composableBuilder(
+    column: $table.targetDeviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get lastSentDate => $composableBuilder(
     column: $table.lastSentDate,
     builder: (column) => ColumnOrderings(column),
@@ -2176,6 +2244,11 @@ class $$SchedulesTableAnnotationComposer
 
   GeneratedColumn<int> get sendMinute => $composableBuilder(
     column: $table.sendMinute,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get targetDeviceId => $composableBuilder(
+    column: $table.targetDeviceId,
     builder: (column) => column,
   );
 
@@ -2245,6 +2318,7 @@ class $$SchedulesTableTableManager
                 Value<int> sendDay = const Value.absent(),
                 Value<int> sendHour = const Value.absent(),
                 Value<int> sendMinute = const Value.absent(),
+                Value<String?> targetDeviceId = const Value.absent(),
                 Value<DateTime?> lastSentDate = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
               }) => SchedulesCompanion(
@@ -2254,6 +2328,7 @@ class $$SchedulesTableTableManager
                 sendDay: sendDay,
                 sendHour: sendHour,
                 sendMinute: sendMinute,
+                targetDeviceId: targetDeviceId,
                 lastSentDate: lastSentDate,
                 isActive: isActive,
               ),
@@ -2265,6 +2340,7 @@ class $$SchedulesTableTableManager
                 required int sendDay,
                 Value<int> sendHour = const Value.absent(),
                 Value<int> sendMinute = const Value.absent(),
+                Value<String?> targetDeviceId = const Value.absent(),
                 Value<DateTime?> lastSentDate = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
               }) => SchedulesCompanion.insert(
@@ -2274,6 +2350,7 @@ class $$SchedulesTableTableManager
                 sendDay: sendDay,
                 sendHour: sendHour,
                 sendMinute: sendMinute,
+                targetDeviceId: targetDeviceId,
                 lastSentDate: lastSentDate,
                 isActive: isActive,
               ),

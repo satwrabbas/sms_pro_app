@@ -4,6 +4,9 @@ import 'package:crm_repository/crm_repository.dart';
 import 'package:local_storage_api/local_storage_api.dart';
 import '../cubit/campaigns_cubit.dart';
 
+// ==========================================
+// الصفحة الرئيسية للحملات
+// ==========================================
 class CampaignsPage extends StatelessWidget {
   const CampaignsPage({super.key});
 
@@ -21,190 +24,64 @@ class CampaignsPage extends StatelessWidget {
 class CampaignsView extends StatelessWidget {
   const CampaignsView({super.key});
 
-  // ==========================================
-  // نافذة الإضافة والتعديل للمجموعات
-  // ==========================================
-  void _showGroupDialog(BuildContext context, {Group? group}) {
-    final isEditing = group != null;
-    final nameController = TextEditingController(text: isEditing ? group.name : '');
-    final cubit = context.read<CampaignsCubit>();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(isEditing ? 'تعديل المجموعة' : 'مجموعة جديدة'),
-        content: TextField(
-          controller: nameController,
-          decoration: const InputDecoration(labelText: 'اسم المجموعة (مثال: عملاء VIP)'),
-        ),
-        actions:[
-          if (isEditing)
-            TextButton(
-              onPressed: () {
-                cubit.deleteGroup(group);
-                Navigator.pop(context);
-              },
-              child: const Text('حذف', style: TextStyle(color: Colors.red)),
-            ),
-          const Spacer(),
-          TextButton(
-            onPressed: () => Navigator.pop(context), 
-            child: const Text('إلغاء')
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (nameController.text.isNotEmpty) {
-                isEditing
-                    ? cubit.editGroup(group, nameController.text.trim())
-                    : cubit.createGroup(nameController.text.trim());
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('حفظ'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==========================================
-  // نافذة الإضافة والتعديل للحملات (مع منتقي الوقت ⏰)
-  // ==========================================
-  void _showScheduleDialog(BuildContext context, List<Group> groups, {Schedule? schedule}) {
+  // 🔒 قفل الأمان الأول والثاني: التحقق قبل فتح نافذة الحملة
+  void _validateAndShowScheduleDialog(
+    BuildContext context,
+    List<Group> groups,
+    List<Map<String, dynamic>> devices, {
+    Schedule? schedule,
+  }) {
     if (groups.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('يجب إنشاء مجموعة أولاً!'), backgroundColor: Colors.orange),
+      _showSnackBar(context, 'يجب إنشاء مجموعة أولاً! 📁', Colors.orange);
+      return;
+    }
+
+    if (devices.isEmpty) {
+      _showSnackBar(
+        context,
+        'يجب ربط هاتف واحد على الأقل من (لوحة التحكم) قبل إنشاء حملة! 📱',
+        Colors.redAccent,
+        duration: const Duration(seconds: 4),
       );
       return;
     }
 
-    final isEditing = schedule != null;
-    final messageController = TextEditingController(text: isEditing ? schedule.message : '');
-    final dayController = TextEditingController(text: isEditing ? schedule.sendDay.toString() : '');
-    
-    Group? selectedGroup = isEditing 
-        ? groups.firstWhere((g) => g.id == schedule.groupId, orElse: () => groups.first) 
-        : groups.first; 
-
-    // 🌟 جلب الوقت السابق إذا كنا نعدل، أو تعيين 9 صباحاً كافتراضي
-    TimeOfDay selectedTime = isEditing 
-        ? TimeOfDay(hour: schedule.sendHour, minute: schedule.sendMinute) 
-        : const TimeOfDay(hour: 9, minute: 0);
-
-    final cubit = context.read<CampaignsCubit>();
-
+    // إذا تم اجتياز الأقفال، نفتح النافذة
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: Text(isEditing ? 'تعديل الحملة 🚀' : 'حملة أتمتة جديدة 🚀'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children:[
-                DropdownButtonFormField<Group>(
-                  value: selectedGroup,
-                  decoration: const InputDecoration(labelText: 'اختر المجموعة'),
-                  items: groups.map((g) => DropdownMenuItem(value: g, child: Text(g.name))).toList(),
-                  onChanged: (val) => setState(() => selectedGroup = val),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: messageController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'نص الرسالة (SMS)', border: OutlineInputBorder()),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: dayController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'يوم الإرسال في الشهر (1 - 31)'),
-                ),
-                const SizedBox(height: 16),
-                
-                // 🌟 زر اختيار الوقت
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: ListTile(
-                    leading: const Icon(Icons.access_time, color: Colors.teal),
-                    title: const Text('وقت الإرسال', style: TextStyle(fontSize: 14)),
-                    // format يعرض الوقت بشكل جميل حسب لغة هاتف المستخدم (AM/PM)
-                    subtitle: Text(selectedTime.format(context), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)),
-                    trailing: const Icon(Icons.edit, size: 20),
-                    onTap: () async {
-                      final picked = await showTimePicker(
-                        context: context, 
-                        initialTime: selectedTime,
-                      );
-                      if (picked != null) {
-                        setState(() {
-                          selectedTime = picked;
-                        });
-                      }
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions:[
-            if (isEditing) 
-              TextButton(
-                onPressed: () {
-                  cubit.deleteSchedule(schedule);
-                  Navigator.pop(context);
-                },
-                child: const Text('حذف', style: TextStyle(color: Colors.red)),
-              ),
-            const Spacer(),
-            TextButton(
-              onPressed: () => Navigator.pop(context), 
-              child: const Text('إلغاء')
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final day = int.tryParse(dayController.text);
-                if (messageController.text.isNotEmpty && day != null && day >= 1 && day <= 31 && selectedGroup != null) {
-                  isEditing
-                      ? cubit.editSchedule(
-                          originalSchedule: schedule, 
-                          newMessage: messageController.text.trim(), 
-                          newSendDay: day, 
-                          newSendHour: selectedTime.hour, 
-                          newSendMinute: selectedTime.minute, // 🌟 نرسل الوقت الجديد
-                        )
-                      : cubit.createSchedule(
-                          groupId: selectedGroup!.id, 
-                          message: messageController.text.trim(), 
-                          sendDay: day, 
-                          sendHour: selectedTime.hour, 
-                          sendMinute: selectedTime.minute, // 🌟 نرسل الوقت الجديد
-                        );
-                  Navigator.pop(context);
-                }
-              },
-              child: const Text('حفظ'),
-            ),
-          ],
+      builder: (_) => BlocProvider.value(
+        value: context.read<CampaignsCubit>(), // تمرير الـ Cubit للنافذة المنبثقة
+        child: _ScheduleDialogWidget(
+          groups: groups,
+          devices: devices,
+          schedule: schedule,
         ),
       ),
     );
   }
 
-  // ==========================================
-  // بناء الشاشة الرئيسية (التبويبات)
-  // ==========================================
+  void _showSnackBar(BuildContext context, String message, Color color, {Duration duration = const Duration(seconds: 2)}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: const TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: color,
+        duration: duration,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('الحملات والمجموعات'),
+          title: const Text('الحملات والمجموعات', style: TextStyle(fontWeight: FontWeight.bold)),
+          centerTitle: true,
+          elevation: 0,
           bottom: const TabBar(
+            indicatorColor: Colors.white,
             tabs:[
               Tab(icon: Icon(Icons.rocket_launch), text: 'الحملات'),
               Tab(icon: Icon(Icons.group), text: 'المجموعات'),
@@ -215,92 +92,15 @@ class CampaignsView extends StatelessWidget {
           builder: (context, state) {
             if (state is CampaignsLoading) {
               return const Center(child: CircularProgressIndicator());
-            } 
-            else if (state is CampaignsError) {
-              return Center(child: Text(state.message, style: const TextStyle(color: Colors.red)));
-            } 
-            else if (state is CampaignsLoaded) {
-              final groups = state.groups;
-              final schedules = state.schedules;
-
+            } else if (state is CampaignsError) {
+              return Center(
+                child: Text(state.message, style: const TextStyle(color: Colors.red, fontSize: 16)),
+              );
+            } else if (state is CampaignsLoaded) {
               return TabBarView(
                 children:[
-                  // ----------------------------------------
-                  // التبويب الأول: الحملات المجدولة
-                  // ----------------------------------------
-                  Scaffold(
-                    body: schedules.isEmpty
-                        ? const Center(child: Text('لا توجد حملات أتمتة بعد. قم بإنشاء حملة.'))
-                        : ListView.builder(
-                            itemCount: schedules.length,
-                            itemBuilder: (context, i) {
-                              final schedule = schedules[i];
-                              final groupName = groups.firstWhere((g) => g.id == schedule.groupId, orElse: () => const Group(id: -1, name: 'محذوفة')).name;
-                              
-                              return Card(
-                                margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                child: ListTile(
-                                  leading: const CircleAvatar(backgroundColor: Colors.blue, child: Icon(Icons.sms, color: Colors.white)),
-                                  title: Text('لمجموعة: $groupName', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children:[
-                                      Text('رسالة: ${schedule.message}'),
-                                      const SizedBox(height: 4),
-                                      // 🌟 عرض الوقت الجميل
-                                      Text(
-                                        '⌚ الإرسال: يوم ${schedule.sendDay}، الساعة ${TimeOfDay(hour: schedule.sendHour, minute: schedule.sendMinute).format(context)}', 
-                                        style: const TextStyle(color: Colors.teal, fontWeight: FontWeight.bold, fontSize: 12),
-                                      ),
-                                    ],
-                                  ),
-                                  // 🌟 زر التشغيل والإيقاف للحملة
-                                  trailing: Switch(
-                                    value: schedule.isActive,
-                                    activeColor: Colors.green,
-                                    onChanged: (val) {
-                                      context.read<CampaignsCubit>().toggleScheduleActive(schedule);
-                                    },
-                                  ),
-                                  // عند الضغط على الكرت نفتح نافذة التعديل
-                                  onTap: () => _showScheduleDialog(context, groups, schedule: schedule),
-                                ),
-                              );
-                            },
-                          ),
-                    floatingActionButton: FloatingActionButton.extended(
-                      onPressed: () => _showScheduleDialog(context, groups),
-                      icon: const Icon(Icons.add),
-                      label: const Text('حملة جديدة'),
-                    ),
-                  ),
-
-                  // ----------------------------------------
-                  // التبويب الثاني: المجموعات
-                  // ----------------------------------------
-                  Scaffold(
-                    body: groups.isEmpty
-                        ? const Center(child: Text('لا توجد مجموعات بعد. قم بإنشاء مجموعة.'))
-                        : ListView.builder(
-                            itemCount: groups.length,
-                            itemBuilder: (context, i) {
-                              final group = groups[i];
-                              return ListTile(
-                                leading: const Icon(Icons.folder, color: Colors.amber),
-                                title: Text(group.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                trailing: IconButton(
-                                  icon: const Icon(Icons.edit, color: Colors.grey),
-                                  onPressed: () => _showGroupDialog(context, group: group),
-                                ),
-                              );
-                            },
-                          ),
-                    floatingActionButton: FloatingActionButton.extended(
-                      onPressed: () => _showGroupDialog(context),
-                      icon: const Icon(Icons.add),
-                      label: const Text('مجموعة جديدة'),
-                    ),
-                  ),
+                  _buildCampaignsTab(context, state.schedules, state.groups, state.devices),
+                  _buildGroupsTab(context, state.groups),
                 ],
               );
             }
@@ -308,6 +108,381 @@ class CampaignsView extends StatelessWidget {
           },
         ),
       ),
+    );
+  }
+
+  // ==========================================
+  // واجهة تبويب الحملات
+  // ==========================================
+  Widget _buildCampaignsTab(
+    BuildContext context,
+    List<Schedule> schedules,
+    List<Group> groups,
+    List<Map<String, dynamic>> devices,
+  ) {
+    return Scaffold(
+      body: schedules.isEmpty
+          ? const Center(child: Text('لا توجد حملات أتمتة بعد. قم بإنشاء حملة 🚀', style: TextStyle(fontSize: 16)))
+          : ListView.builder(
+              padding: const EdgeInsets.all(8),
+              itemCount: schedules.length,
+              itemBuilder: (context, i) {
+                final schedule = schedules[i];
+                final groupName = groups.firstWhere((g) => g.id == schedule.groupId, orElse: () => const Group(id: -1, name: 'مجموعة محذوفة')).name;
+                final deviceName = devices.firstWhere((d) => d['device_id'] == schedule.targetDeviceId, orElse: () => {'device_name': 'جهاز غير محدد'})['device_name'];
+                
+                // 🌟 عرض الوقت الجميل في الكرت
+                final time = TimeOfDay(hour: schedule.sendHour, minute: schedule.sendMinute).format(context);
+
+                return Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  margin: const EdgeInsets.symmetric(vertical: 6),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () => _validateAndShowScheduleDialog(context, groups, devices, schedule: schedule),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Row(
+                        children:[
+                          const CircleAvatar(
+                            radius: 24,
+                            backgroundColor: Colors.teal,
+                            child: Icon(Icons.sms, color: Colors.white),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children:[
+                                Text('مجموعة: $groupName', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                const SizedBox(height: 4),
+                                Text(schedule.message, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.grey[700])),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children:[
+                                    const Icon(Icons.phone_android, size: 14, color: Colors.deepOrange),
+                                    const SizedBox(width: 4),
+                                    Text(deviceName, style: const TextStyle(color: Colors.deepOrange, fontSize: 12, fontWeight: FontWeight.bold)),
+                                    const SizedBox(width: 12),
+                                    const Icon(Icons.calendar_month, size: 14, color: Colors.teal),
+                                    const SizedBox(width: 4),
+                                    Text('يوم ${schedule.sendDay} - $time', style: const TextStyle(color: Colors.teal, fontSize: 12, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch(
+                            value: schedule.isActive,
+                            activeColor: Colors.teal,
+                            onChanged: (_) => context.read<CampaignsCubit>().toggleScheduleActive(schedule),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _validateAndShowScheduleDialog(context, groups, devices),
+        icon: const Icon(Icons.add),
+        label: const Text('حملة جديدة'),
+      ),
+    );
+  }
+
+  // ==========================================
+  // واجهة تبويب المجموعات
+  // ==========================================
+  Widget _buildGroupsTab(BuildContext context, List<Group> groups) {
+    return Scaffold(
+      body: groups.isEmpty
+          ? const Center(child: Text('لا توجد مجموعات بعد. قم بإنشاء مجموعة 📁', style: TextStyle(fontSize: 16)))
+          : ListView.builder(
+              padding: const EdgeInsets.all(8),
+              itemCount: groups.length,
+              itemBuilder: (context, i) {
+                final group = groups[i];
+                return Card(
+                  elevation: 1,
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  child: ListTile(
+                    leading: const CircleAvatar(backgroundColor: Colors.amber, child: Icon(Icons.folder, color: Colors.white)),
+                    title: Text(group.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.edit, color: Colors.grey),
+                      onPressed: () => _showGroupDialog(context, group: group),
+                    ),
+                  ),
+                );
+              },
+            ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showGroupDialog(context),
+        icon: const Icon(Icons.add),
+        label: const Text('مجموعة جديدة'),
+      ),
+    );
+  }
+
+  void _showGroupDialog(BuildContext context, {Group? group}) {
+    showDialog(
+      context: context,
+      builder: (_) => BlocProvider.value(
+        value: context.read<CampaignsCubit>(),
+        child: _GroupDialogWidget(group: group),
+      ),
+    );
+  }
+}
+
+// ==========================================
+// 💡 نافذة إضافة/تعديل الحملة (تم فصلها باحترافية)
+// ==========================================
+class _ScheduleDialogWidget extends StatefulWidget {
+  final List<Group> groups;
+  final List<Map<String, dynamic>> devices;
+  final Schedule? schedule;
+
+  const _ScheduleDialogWidget({required this.groups, required this.devices, this.schedule});
+
+  @override
+  State<_ScheduleDialogWidget> createState() => _ScheduleDialogWidgetState();
+}
+
+class _ScheduleDialogWidgetState extends State<_ScheduleDialogWidget> {
+  final _formKey = GlobalKey<FormState>(); 
+  late TextEditingController _messageController;
+  late TextEditingController _dayController;
+  Group? _selectedGroup;
+  String? _selectedDeviceId;
+  late TimeOfDay _selectedTime; // 🌟 إضافة متغير الوقت
+
+  bool get _isEditing => widget.schedule != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _messageController = TextEditingController(text: _isEditing ? widget.schedule!.message : '');
+    _dayController = TextEditingController(text: _isEditing ? widget.schedule!.sendDay.toString() : '');
+    
+    // 🌟 تهيئة الوقت (من الحملة أو 9 صباحاً كافتراضي)
+    _selectedTime = _isEditing 
+        ? TimeOfDay(hour: widget.schedule!.sendHour, minute: widget.schedule!.sendMinute) 
+        : const TimeOfDay(hour: 9, minute: 0);
+
+    // تحديد المجموعة 
+    _selectedGroup = _isEditing
+        ? widget.groups.firstWhere((g) => g.id == widget.schedule!.groupId, orElse: () => widget.groups.first)
+        : widget.groups.first;
+
+    // تحديد الجهاز
+    if (_isEditing && widget.schedule!.targetDeviceId != null) {
+      final deviceExists = widget.devices.any((d) => d['device_id'] == widget.schedule!.targetDeviceId);
+      _selectedDeviceId = deviceExists ? widget.schedule!.targetDeviceId : widget.devices.first['device_id'];
+    } else if (widget.devices.isNotEmpty) {
+      _selectedDeviceId = widget.devices.first['device_id'];
+    }
+  }
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    _dayController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (_formKey.currentState!.validate() && _selectedGroup != null && _selectedDeviceId != null) {
+      final cubit = context.read<CampaignsCubit>();
+      final day = int.parse(_dayController.text);
+      final msg = _messageController.text.trim();
+
+      if (_isEditing) {
+        cubit.editSchedule(
+          originalSchedule: widget.schedule!,
+          newMessage: msg,
+          newSendDay: day,
+          newSendHour: _selectedTime.hour, // 🌟 إرسال الساعة
+          newSendMinute: _selectedTime.minute, // 🌟 إرسال الدقيقة
+          newTargetDeviceId: _selectedDeviceId,
+        );
+      } else {
+        cubit.createSchedule(
+          groupId: _selectedGroup!.id,
+          message: msg,
+          sendDay: day,
+          sendHour: _selectedTime.hour, // 🌟 إرسال الساعة
+          sendMinute: _selectedTime.minute, // 🌟 إرسال الدقيقة
+          targetDeviceId: _selectedDeviceId,
+        );
+      }
+      Navigator.pop(context);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text(_isEditing ? 'تعديل الحملة 🚀' : 'حملة أتمتة جديدة 🚀', style: const TextStyle(fontWeight: FontWeight.bold)),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children:[
+              DropdownButtonFormField<Group>(
+                value: _selectedGroup,
+                decoration: InputDecoration(labelText: 'اختر المجموعة', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10))),
+                items: widget.groups.map((g) => DropdownMenuItem(value: g, child: Text(g.name))).toList(),
+                onChanged: (val) => setState(() => _selectedGroup = val),
+              ),
+              const SizedBox(height: 16),
+              
+              DropdownButtonFormField<String?>(
+                value: _selectedDeviceId,
+                decoration: InputDecoration(labelText: 'الهاتف المرسل 📱', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10))),
+                items: widget.devices.map((d) => DropdownMenuItem(value: d['device_id'] as String?, child: Text(d['device_name']))).toList(),
+                onChanged: (val) => setState(() => _selectedDeviceId = val),
+                validator: (val) => val == null ? 'يرجى اختيار هاتف للإرسال' : null,
+              ),
+              const SizedBox(height: 16),
+
+              TextFormField(
+                controller: _messageController,
+                maxLines: 3,
+                decoration: InputDecoration(labelText: 'نص الرسالة (SMS)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10))),
+                validator: (val) => val == null || val.trim().isEmpty ? 'يرجى كتابة نص الرسالة' : null,
+              ),
+              const SizedBox(height: 16),
+
+              TextFormField(
+                controller: _dayController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(labelText: 'يوم الإرسال (1 - 31)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10))),
+                validator: (val) {
+                  if (val == null || val.isEmpty) return 'يرجى تحديد اليوم';
+                  final day = int.tryParse(val);
+                  if (day == null || day < 1 || day > 31) return 'أدخل رقماً صحيحاً بين 1 و 31';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              // 🌟 زر اختيار الوقت المحدث
+              InkWell(
+                onTap: () async {
+                  final picked = await showTimePicker(context: context, initialTime: _selectedTime);
+                  if (picked != null) {
+                    setState(() => _selectedTime = picked);
+                  }
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(10)),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children:[
+                      const Icon(Icons.access_time, color: Colors.teal),
+                      Text('وقت الإرسال: ${_selectedTime.format(context)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      const Icon(Icons.edit, size: 20, color: Colors.grey),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions:[
+        if (_isEditing)
+          TextButton(
+            onPressed: () {
+              context.read<CampaignsCubit>().deleteSchedule(widget.schedule!);
+              Navigator.pop(context);
+            },
+            child: const Text('حذف', style: TextStyle(color: Colors.red)),
+          ),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+          onPressed: _save,
+          child: const Text('حفظ', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    );
+  }
+}
+
+// ==========================================
+// 💡 نافذة إضافة/تعديل المجموعة
+// ==========================================
+class _GroupDialogWidget extends StatefulWidget {
+  final Group? group;
+  const _GroupDialogWidget({this.group});
+
+  @override
+  State<_GroupDialogWidget> createState() => _GroupDialogWidgetState();
+}
+
+class _GroupDialogWidgetState extends State<_GroupDialogWidget> {
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _nameController;
+
+  bool get _isEditing => widget.group != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: _isEditing ? widget.group!.name : '');
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text(_isEditing ? 'تعديل المجموعة' : 'مجموعة جديدة'),
+      content: Form(
+        key: _formKey,
+        child: TextFormField(
+          controller: _nameController,
+          decoration: InputDecoration(labelText: 'اسم المجموعة', hintText: 'مثال: عملاء VIP', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10))),
+          validator: (val) => val == null || val.trim().isEmpty ? 'يرجى إدخال اسم للمجموعة' : null,
+        ),
+      ),
+      actions:[
+        if (_isEditing)
+          TextButton(
+            onPressed: () {
+              context.read<CampaignsCubit>().deleteGroup(widget.group!);
+              Navigator.pop(context);
+            },
+            child: const Text('حذف', style: TextStyle(color: Colors.red)),
+          ),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+          onPressed: () {
+            if (_formKey.currentState!.validate()) {
+              final cubit = context.read<CampaignsCubit>();
+              final name = _nameController.text.trim();
+              _isEditing ? cubit.editGroup(widget.group!, name) : cubit.createGroup(name);
+              Navigator.pop(context);
+            }
+          },
+          child: const Text('حفظ', style: TextStyle(color: Colors.white)),
+        ),
+      ],
     );
   }
 }

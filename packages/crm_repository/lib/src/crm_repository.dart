@@ -1,8 +1,8 @@
 import 'package:local_storage_api/local_storage_api.dart';
-import 'package:cloud_storage_api/cloud_storage_api.dart'; // ☁️
+import 'package:cloud_storage_api/cloud_storage_api.dart'; 
 import 'package:drift/drift.dart' as drift;
-import 'package:shared_preferences/shared_preferences.dart'; // 🌟
-/// المدير المسؤول عن إدارة بيانات التطبيق (محلياً وسحابياً)
+import 'package:shared_preferences/shared_preferences.dart';
+
 class CrmRepository {
   const CrmRepository({
     required AppDatabase localStorage,
@@ -14,11 +14,9 @@ class CrmRepository {
   final CloudStorageClient _cloudStorage;
 
   // ==========================================
-  // 1. قسم المصادقة (Authentication) ☁️
+  // 1. قسم المصادقة والأجهزة ☁️📱
   // ==========================================
-  
   Stream<AuthState> get authStateChanges => _cloudStorage.authStateChanges;
-  
   Session? get currentSession => _cloudStorage.currentSession;
 
   Future<void> signIn({required String email, required String password}) async {
@@ -29,20 +27,39 @@ class CrmRepository {
     await _cloudStorage.signUp(email: email, password: password);
   }
 
-  Future<void> signOut() async {  
-    // 0. 🗑️ مسح مفتاح الهاتف من السحابة قبل الخروج
-    await removeFcmToken();
+  Future<void> signOut() async {
+    // 0. مسح الجهاز من السحابة قبل الخروج
+    final prefs = await SharedPreferences.getInstance();
+    final deviceId = prefs.getString('registered_device_id');
+    if (deviceId != null) {
+      await _cloudStorage.removeDevice(deviceId);
+      await prefs.remove('registered_device_id');
+    }
     
-    // 1. 🧹 مسح كل البيانات المحلية 
+    // 1. مسح البيانات المحلية
     await _localStorage.clearAllData();
-    
-    // 2. ☁️ تسجيل الخروج
+    // 2. تسجيل الخروج
     await _cloudStorage.signOut();
   }
+
+  /// 🌟 تسجيل الجهاز في السحابة
+  Future<String?> registerDevice(String deviceName, String token, String hardwareId) async {
+    return await _cloudStorage.registerDevice(deviceName: deviceName, fcmToken: token, hardwareId: hardwareId);
+  }
+
+  /// 🌟 فك ارتباط الجهاز
+  Future<void> removeDevice(String deviceId) async {
+    await _cloudStorage.removeDevice(deviceId);
+  }
+
+  /// 🌟 جلب قائمة الأجهزة المرتبطة بالحساب
+  Future<List<Map<String, dynamic>>> getRegisteredDevices() async {
+    return await _cloudStorage.fetchDevices();
+  }
+
   // ==========================================
-  // 2. قسم جهات الاتصال (Contacts) 💾
+  // 2. قسم جهات الاتصال 💾
   // ==========================================
-  
   Future<List<Contact>> getContacts() async {
     return await _localStorage.getAllContacts();
   }
@@ -53,7 +70,7 @@ class CrmRepository {
         name: drift.Value(contact['name'] ?? 'بدون اسم'),
         phone: drift.Value(contact['phone'] ?? ''),
       );
-      await _localStorage.insertContact(companion);
+      await _localStorage.upsertContact(companion);
     }
   }
 
@@ -61,95 +78,90 @@ class CrmRepository {
     return await _localStorage.deleteContact(contact);
   }
 
-  /// 🌟 الدالة المصححة والوحيدة لتحديث المجموعة
   Future<void> updateContactGroup(Contact contact, int? groupId) async {
-    // نطلب من قاعدة البيانات التحديث المباشر للـ ID الخاص بالعميل لتجنب مشكلة الـ Unique
     await _localStorage.updateContactGroupDB(contact.id, groupId); 
   }
 
   // ==========================================
-  // 3. قسم المجموعات والحملات (Groups & Campaigns) 📅
+  // 3. قسم المجموعات والحملات 📅
   // ==========================================
-
   Future<List<Group>> getGroups() async {
     return await _localStorage.getAllGroups();
   }
 
   Future<int> addGroup(String name) async {
-    final companion = GroupsCompanion(
-      name: drift.Value(name),
-    );
-    return await _localStorage.insertGroup(companion);
+    return await _localStorage.insertGroup(GroupsCompanion(name: drift.Value(name)));
+  }
+
+  Future<void> deleteGroup(Group group) async {
+    await _localStorage.clearGroupFromContacts(group.id);
+    await _localStorage.deleteGroup(group);
+    await _cloudStorage.deleteGroup(group.id);
+  }
+
+  Future<void> updateGroup(Group group) async {
+    await _localStorage.updateGroup(group);
   }
 
   Future<List<Schedule>> getSchedules() async {
     return await _localStorage.getAllSchedules();
   }
 
-  Future<int> addSchedule({required int groupId, required String message, required int sendDay, required int sendHour, required int sendMinute}) async {
+  /// 🌟 تمت إضافة targetDeviceId لدالة إنشاء الحملة
+  Future<int> addSchedule({
+    required int groupId, 
+    required String message, 
+    required int sendDay, 
+    required int sendHour, 
+    required int sendMinute,
+    String? targetDeviceId, // 🌟
+  }) async {
     final companion = SchedulesCompanion(
-      groupId: drift.Value(groupId), message: drift.Value(message), sendDay: drift.Value(sendDay),
-      sendHour: drift.Value(sendHour), sendMinute: drift.Value(sendMinute), // 🌟
+      groupId: drift.Value(groupId), 
+      message: drift.Value(message), 
+      sendDay: drift.Value(sendDay),
+      sendHour: drift.Value(sendHour), 
+      sendMinute: drift.Value(sendMinute),
+      targetDeviceId: drift.Value(targetDeviceId), // 🌟
     );
     return await _localStorage.insertSchedule(companion);
   }
 
-  // ==========================================
-  // 4. قسم السجلات (Logs) 📊
-  // ==========================================
+  Future<void> deleteSchedule(Schedule schedule) async {
+    await _localStorage.deleteSchedule(schedule);
+    await _cloudStorage.deleteSchedule(schedule.id);
+  }
 
+  Future<void> updateSchedule(Schedule schedule) async {
+    await _localStorage.updateSchedule(schedule);
+  }
+
+  // ==========================================
+  // 4. قسم السجلات 📊
+  // ==========================================
   Future<List<Message>> getMessageLogs() async {
     return await _localStorage.getAllMessages();
   }
 
   Future<int> addMessageLog({required String phone, required String body, required String type}) async {
-    final companion = MessagesCompanion(
-      phone: drift.Value(phone),
-      body: drift.Value(body),
-      type: drift.Value(type),
-      messageDate: drift.Value(DateTime.now()), 
-    );
-    return await _localStorage.insertMessage(companion);
+    return await _localStorage.insertMessage(MessagesCompanion(
+      phone: drift.Value(phone), body: drift.Value(body), type: drift.Value(type), messageDate: drift.Value(DateTime.now()), 
+    ));
   }
 
-// ==========================================
-  // 5. قسم المزامنة الشاملة (Cloud Sync) ☁️
   // ==========================================
-
-  /// 🌟 تمرير مفتاح الهاتف للسحابة
-  Future<void> saveFcmToken(String token) async {
-    await _cloudStorage.saveFcmToken(token);
-  }
-
-  /// 🗑️ حذف مفتاح الهاتف من السحابة
-  Future<void> removeFcmToken() async {
-    await _cloudStorage.removeFcmToken();
-  }
-  /// رفع كل البيانات المحلية إلى Supabase
+  // 5. قسم المزامنة الشاملة ☁️
+  // ==========================================
   Future<void> syncAllToCloud() async {
-    // 1. جلب كل البيانات من الهاتف
     final groups = await _localStorage.getAllGroups();
     final contacts = await _localStorage.getAllContacts();
     final schedules = await _localStorage.getAllSchedules();
-    
-    // 🌟 التصحيح هنا: استخدمنا getAllMessages بدلاً من getMessageLogs
     final messages = await _localStorage.getAllMessages(); 
 
-    // 2. تحويل المجموعات
-    final groupsJson = groups.map((g) => {
-      'id': g.id,
-      'name': g.name,
-    }).toList();
-
-    // 3. تحويل جهات الاتصال
-    final contactsJson = contacts.map((c) => {
-      'id': c.id,
-      'name': c.name,
-      'phone': c.phone,
-      'group_id': c.groupId, 
-    }).toList();
-
-    // 4. تحويل الحملات المجدولة
+    final groupsJson = groups.map((g) => {'id': g.id, 'name': g.name}).toList();
+    final contactsJson = contacts.map((c) => {'id': c.id, 'name': c.name, 'phone': c.phone, 'group_id': c.groupId}).toList();
+    
+    // 🌟 تمت إضافة target_device_id للرفع
     final schedulesJson = schedules.map((s) => {
       'id': s.id,
       'group_id': s.groupId,
@@ -157,61 +169,38 @@ class CrmRepository {
       'send_day': s.sendDay,
       'send_hour': s.sendHour,
       'send_minute': s.sendMinute,
+      'target_device_id': s.targetDeviceId, // 🌟
       'last_sent_date': s.lastSentDate?.toIso8601String(),
       'is_active': s.isActive,
     }).toList();
 
-    // 5. تحويل سجلات الرسائل
-    final messagesJson = messages.map((m) => {
-      'id': m.id,
-      'phone': m.phone,
-      'body': m.body,
-      'type': m.type,
-      'message_date': m.messageDate.toIso8601String(),
-    }).toList();
+    final messagesJson = messages.map((m) => {'id': m.id, 'phone': m.phone, 'body': m.body, 'type': m.type, 'message_date': m.messageDate.toIso8601String()}).toList();
 
-    // 6. إرسالها إلى السحابة عبر العميل
     await _cloudStorage.syncGroups(groupsJson);
     await _cloudStorage.syncContacts(contactsJson);
     await _cloudStorage.syncSchedules(schedulesJson);
     await _cloudStorage.syncMessages(messagesJson);
-    // 🌟 بعد رفع كل شيء بنجاح، نحدث وقت السحابة ووقت الهاتف
+
     await _cloudStorage.updateCloudSyncTime();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('local_sync_time', DateTime.now().toUtc().toIso8601String());
   }
 
-  /// 📥 تنزيل البيانات من السحابة وتحديثها في الهاتف (Upsert)
   Future<void> downloadAllFromCloud() async {
-    // 1. جلب البيانات من السحابة
     final cloudGroups = await _cloudStorage.fetchGroups();
     final cloudContacts = await _cloudStorage.fetchContacts();
     final cloudSchedules = await _cloudStorage.fetchSchedules();
     final cloudMessages = await _cloudStorage.fetchMessages();
 
-    // 2. تحديث أو إضافة المجموعات
     for (var row in cloudGroups) {
-      try {
-        await _localStorage.upsertGroup(GroupsCompanion(
-          id: drift.Value(row['id']),
-          name: drift.Value(row['name']),
-        ));
-      } catch (e) { print("خطأ مزامنة مجموعة: $e"); } 
+      try { await _localStorage.upsertGroup(GroupsCompanion(id: drift.Value(row['id']), name: drift.Value(row['name']))); } catch (_) {} 
     }
 
-    // 3. تحديث أو إضافة جهات الاتصال
     for (var row in cloudContacts) {
-      try {
-        await _localStorage.upsertContact(ContactsCompanion(
-          id: drift.Value(row['id']),
-          name: drift.Value(row['name']),
-          phone: drift.Value(row['phone']),
-          groupId: drift.Value(row['group_id']),
-        ));
-      } catch (e) { print("خطأ مزامنة عميل: $e"); }
+      try { await _localStorage.upsertContact(ContactsCompanion(id: drift.Value(row['id']), name: drift.Value(row['name']), phone: drift.Value(row['phone']), groupId: drift.Value(row['group_id']))); } catch (_) {}
     }
 
-    // 4. تحديث أو إضافة الحملات
+    // 🌟 تمت إضافة target_device_id للتنزيل
     for (var row in cloudSchedules) {
       try {
         await _localStorage.upsertSchedule(SchedulesCompanion(
@@ -221,83 +210,33 @@ class CrmRepository {
           sendHour: drift.Value(row['send_hour'] ?? 9),
           sendMinute: drift.Value(row['send_minute'] ?? 0),
           sendDay: drift.Value(row['send_day']),
+          targetDeviceId: drift.Value(row['target_device_id']), // 🌟
           lastSentDate: drift.Value(row['last_sent_date'] != null ? DateTime.parse(row['last_sent_date']) : null),
           isActive: drift.Value(row['is_active']),
         ));
-      } catch (e) { print("خطأ مزامنة حملة: $e"); }
+      } catch (_) {}
     }
 
-    // 5. تحديث أو إضافة السجلات
     for (var row in cloudMessages) {
-      try {
-        await _localStorage.upsertMessage(MessagesCompanion(
-          id: drift.Value(row['id']),
-          phone: drift.Value(row['phone']),
-          body: drift.Value(row['body']),
-          type: drift.Value(row['type']),
-          messageDate: drift.Value(DateTime.parse(row['message_date'])),
-        ));
-      } catch (e) { print("خطأ مزامنة سجل: $e"); }
+      try { await _localStorage.upsertMessage(MessagesCompanion(id: drift.Value(row['id']), phone: drift.Value(row['phone']), body: drift.Value(row['body']), type: drift.Value(row['type']), messageDate: drift.Value(DateTime.parse(row['message_date'])))); } catch (_) {}
     }
   }
-  /// 🌟 التنزيل الذكي (لا ينزل البيانات إلا إذا كانت السحابة أحدث من الهاتف)
-  /// تُرجع true إذا تم التنزيل، و false إذا كان الهاتف محدثاً بالفعل
-  Future<bool> downloadIfCloudIsNewer() async {
-    // 1. نسأل السحابة: متى كان آخر تحديث؟
-    final cloudTime = await _cloudStorage.getCloudSyncTime();
-    if (cloudTime == null) return false; // السحابة فارغة، لا تفعل شيئاً
 
-    // 2. نسأل الهاتف: متى كان آخر تحديث لك؟
+  Future<bool> downloadIfCloudIsNewer() async {
+    final cloudTime = await _cloudStorage.getCloudSyncTime();
+    if (cloudTime == null) return false;
+
     final prefs = await SharedPreferences.getInstance();
     final localTimeString = prefs.getString('local_sync_time');
     DateTime? localTime;
-    if (localTimeString != null) {
-      localTime = DateTime.parse(localTimeString);
-    }
+    if (localTimeString != null) localTime = DateTime.parse(localTimeString);
 
-    // 3. المقارنة الحاسمة ⚖️
-    // إذا كان الهاتف لم يُحدث أبداً، أو وقت السحابة أحدث من وقت الهاتف
     if (localTime == null || cloudTime.isAfter(localTime)) {
-      print("🔄 السحابة أحدث! جاري مسح الهاتف وتنزيل النسخة النظيفة...");
-      
-      // مسح البيانات المحلية القديمة لمنع تضارب الـ IDs
       await _localStorage.clearAllData();
-      
-      // تنزيل النسخة الطازجة
       await downloadAllFromCloud();
-      
-      // تحديث وقت الهاتف ليطابق وقت السحابة
       await prefs.setString('local_sync_time', cloudTime.toIso8601String());
-      
-      return true; // نعم، تم تحديث بيانات الهاتف
+      return true; 
     }
-
-    print("✅ الهاتف محدث بالفعل. لا حاجة للتنزيل.");
-    return false; // لم يتم تنزيل شيء
-  }
-
-  // --- دوال الحذف الجديدة (تتحدث مع الهاتف والسحابة معاً) ---
-  Future<void> deleteGroup(Group group) async {
-    // 1. نظف العملاء المرتبطين بالمجموعة أولاً
-    await _localStorage.clearGroupFromContacts(group.id);
-    // 2. احذف المجموعة من الهاتف
-    await _localStorage.deleteGroup(group);
-    // 3. احذفها من السحابة
-    await _cloudStorage.deleteGroup(group.id);
-  }
-
-  Future<void> deleteSchedule(Schedule schedule) async {
-    await _localStorage.deleteSchedule(schedule);
-    await _cloudStorage.deleteSchedule(schedule.id);
-  }
-
-  // --- دوال التعديل الجديدة ---
-  Future<void> updateGroup(Group group) async {
-    await _localStorage.updateGroup(group);
-    // لا نحتاج لاستدعاء السحابة مباشرة، لأن المزامنة الشاملة (upsert) ستتكفل بذلك لاحقاً
-  }
-
-  Future<void> updateSchedule(Schedule schedule) async {
-    await _localStorage.updateSchedule(schedule);
+    return false; 
   }
 }
