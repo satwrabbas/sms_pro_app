@@ -80,12 +80,22 @@ serve(async (req) => {
               message: schedule.message
             }
           });
+          
 
           // تحديث تاريخ آخر إرسال في السحابة لمنع التكرار
           await supabase
             .from('schedules')
             .update({ last_sent_date: nowUtc.toISOString() }) // نحفظ الوقت الأصلي كمعيار قياسي
             .eq('id', schedule.id);
+
+           // 🌟 السطر الجديد: إخبار دفتر التحديثات أن السحابة قامت بتعديل بيانات هذا المستخدم!
+          await supabase
+            .from('sync_metadata')
+            .upsert({ 
+               user_id: schedule.user_id, 
+               last_updated_at: nowUtc.toISOString() 
+            });
+
 
           sentCount++;
         }

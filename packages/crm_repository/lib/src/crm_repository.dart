@@ -170,7 +170,6 @@ class CrmRepository {
       'send_hour': s.sendHour,
       'send_minute': s.sendMinute,
       'target_device_id': s.targetDeviceId, // 🌟
-      'last_sent_date': s.lastSentDate?.toIso8601String(),
       'is_active': s.isActive,
     }).toList();
 
