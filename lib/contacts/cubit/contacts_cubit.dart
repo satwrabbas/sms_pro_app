@@ -1,7 +1,8 @@
-import 'package:crm_repository/crm_repository.dart';
+import 'dart:io' show Platform;
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_contacts/flutter_contacts.dart' as phone_contacts;
+import 'package:crm_repository/crm_repository.dart';
 import 'package:local_storage_api/local_storage_api.dart';
+import 'package:flutter_contacts/flutter_contacts.dart' as phone_contacts;
 
 part 'contacts_state.dart';
 
@@ -12,33 +13,63 @@ class ContactsCubit extends Cubit<ContactsState> {
 
   final CrmRepository _repository;
 
-  /// جلب العملاء والمجموعات معاً
   Future<void> loadContacts() async {
     emit(ContactsLoading());
     try {
       final contacts = await _repository.getContacts();
-      final groups = await _repository.getGroups(); // 🌟 جلبنا المجموعات أيضاً
+      final groups = await _repository.getGroups();
       emit(ContactsLoaded(contacts: contacts, groups: groups));
     } catch (e) {
       emit(ContactsError(message: e.toString()));
     }
   }
 
-  /// ربط العميل بالمجموعة
+  /// 🌟 1. تعيين مجموعة لعميل واحد
   Future<void> assignGroup(Contact contact, int? groupId) async {
     try {
       await _repository.updateContactGroup(contact, groupId);
-      await loadContacts(); // تحديث الشاشة فوراً للمستخدم
-      
-      // 🌟 السحر هنا: نأمر التطبيق برفع التعديل للسحابة بصمت! (Fire and Forget)
+      await loadContacts(); 
       _repository.syncAllToCloud(); 
-      
     } catch (e) {
       emit(ContactsError(message: 'خطأ في تعيين المجموعة: $e'));
     }
   }
 
-  /// مزامنة الهاتف (كما أصلحناها سابقاً)
+  /// 🌟 2. تعيين مجموعة لعدة عملاء دفعة واحدة (Bulk Assign)
+  Future<void> assignGroupToMultiple(List<Contact> contacts, int? groupId) async {
+    try {
+      for (var contact in contacts) {
+        await _repository.updateContactGroup(contact, groupId);
+      }
+      await loadContacts(); 
+      _repository.syncAllToCloud(); 
+    } catch (e) {
+      emit(ContactsError(message: 'خطأ في التعيين المتعدد: $e'));
+    }
+  }
+
+  /// 🌟 3. حذف عميل
+  Future<void> deleteContact(Contact contact) async {
+    try {
+      await _repository.deleteContact(contact);
+      await loadContacts();
+      _repository.syncAllToCloud();
+    } catch (e) {
+      emit(ContactsError(message: 'خطأ في الحذف: $e'));
+    }
+  }
+
+  /// 🌟 4. تعديل بيانات العميل
+  Future<void> editContact(Contact contact, String newName, String newPhone) async {
+    try {
+      await _repository.updateContactInfo(contact, newName, newPhone);
+      await loadContacts();
+      _repository.syncAllToCloud();
+    } catch (e) {
+      emit(ContactsError(message: 'خطأ في التعديل: $e'));
+    }
+  }
+
   Future<void> syncFromPhone() async {
     emit(ContactsSyncing());
     try {
@@ -48,14 +79,11 @@ class ContactsCubit extends Cubit<ContactsState> {
 
       if (status == phone_contacts.PermissionStatus.granted || status == phone_contacts.PermissionStatus.limited) {
         final contactsFromPhone = await phone_contacts.FlutterContacts.getAll(
-          properties: {
-            phone_contacts.ContactProperty.name,
-            phone_contacts.ContactProperty.phone,
-          },
+          properties: {phone_contacts.ContactProperty.name, phone_contacts.ContactProperty.phone},
         );
 
-        final formattedContacts =<Map<String, String>>[];
-        for (final c in contactsFromPhone) {
+        final List<Map<String, String>> formattedContacts =[];
+        for (var c in contactsFromPhone) {
           if (c.phones.isNotEmpty) {
             formattedContacts.add({
               'name': c.displayName ?? 'بدون اسم',
@@ -66,6 +94,7 @@ class ContactsCubit extends Cubit<ContactsState> {
 
         await _repository.saveSyncedContacts(formattedContacts);
         await loadContacts();
+        _repository.syncAllToCloud();
       } else {
         emit(ContactsError(message: 'تم رفض صلاحية الوصول لجهات الاتصال'));
       }

@@ -60,6 +60,17 @@ class CrmRepository {
   // ==========================================
   // 2. قسم جهات الاتصال 💾
   // ==========================================
+
+  /// 🌟 تعديل اسم ورقم العميل (مع الاحتفاظ بمجموعته ومعرفه)
+  Future<void> updateContactInfo(Contact contact, String newName, String newPhone) async {
+    final companion = ContactsCompanion(
+      id: drift.Value(contact.id), // نحافظ على الـ ID
+      name: drift.Value(newName),
+      phone: drift.Value(newPhone),
+      groupId: drift.Value(contact.groupId), // نحافظ على مجموعته الحالية
+    );
+    await _localStorage.upsertContact(companion); // نستخدم Upsert ليعمل كتحديث
+  }
   Future<List<Contact>> getContacts() async {
     return await _localStorage.getAllContacts();
   }
